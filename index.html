@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Charisma</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;overflow-x:hidden;}
+  body{background:#120d10;}
+  body::after{
+    content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+    background-repeat:repeat;opacity:0.6;
+  }
+  @keyframes floatUp{0%{transform:translateX(-50%) translateY(0) scale(0.7);opacity:1;}100%{transform:translateX(-50%) translateY(-150px) scale(1.2);opacity:0;}}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
+  @keyframes pop{0%{transform:scale(0.5);opacity:0;}65%{transform:scale(1.12);}100%{transform:scale(1);opacity:1;}}
+  @keyframes blobDrift{0%,100%{transform:translate(0,0) scale(1) rotate(0deg);}33%{transform:translate(14px,-10px) scale(1.03) rotate(1.5deg);}66%{transform:translate(-10px,12px) scale(0.98) rotate(-1deg);}}
+  @keyframes liveGlow{0%,100%{opacity:1;}50%{opacity:0.25;}}
+  @keyframes revealFloat{0%{opacity:0;transform:translateX(-50%) translateY(10px);}18%{opacity:1;transform:translateX(-50%) translateY(0);}75%{opacity:1;}100%{opacity:0;transform:translateX(-50%) translateY(-10px);}}
+  .btn{border:none;cursor:pointer;font-family:'Jost','system-ui',sans-serif;font-weight:500;letter-spacing:0.04em;transition:transform 0.18s,filter 0.18s,opacity 0.18s;}
+  .btn:hover{transform:translateY(-2px);filter:brightness(1.08);}
+  .btn:active{transform:scale(0.97);}
+  .glass{background:rgba(36,26,32,0.75);border:1px solid rgba(196,146,138,0.12);backdrop-filter:blur(16px);border-radius:18px;}
+  .tcard{background:#241a20;border:1px solid rgba(196,146,138,0.12);border-radius:18px;}
+  .scroll-thin{scrollbar-width:thin;scrollbar-color:rgba(196,146,138,0.18) transparent;}
+  .scroll-thin::-webkit-scrollbar{width:2px;}
+  .scroll-thin::-webkit-scrollbar-thumb{background:rgba(196,146,138,0.18);border-radius:10px;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef}=React;
+
+const GIFTS=[
+  {id:1,emoji:"🌸",name:"Petal",   price:50, color:"#d4a0a0"},
+  {id:2,emoji:"🕯️",name:"Candle",  price:75, color:"#c9a87a"},
+  {id:3,emoji:"🌙",name:"Moonlit", price:100,color:"#9b8ec4"},
+  {id:4,emoji:"🫧",name:"Tender",  price:150,color:"#7ab5c9"},
+  {id:5,emoji:"💐",name:"Bouquet", price:200,color:"#c48e9b"},
+  {id:6,emoji:"🍷",name:"Reserve", price:500,color:"#8c3a4a"},
+];
+const PROFILES=[
+  {id:1,name:"Jordan",age:26,city:"Atlanta",vibe:"Creative · Warm-hearted", avatar:"J",hue:"#c4928a"},
+  {id:2,name:"Alex",  age:24,city:"NYC",    vibe:"Thoughtful · Driven",    avatar:"A",hue:"#8aab9b"},
+  {id:3,name:"Morgan",age:28,city:"LA",     vibe:"Free spirit · Genuine",  avatar:"M",hue:"#a08ec4"},
+  {id:4,name:"Riley", age:25,city:"Houston",vibe:"Grounded · Ambitious",   avatar:"R",hue:"#c4a08a"},
+];
+const RESTAURANTS=[
+  {id:1,name:"Bacchanalia",  cuisine:"American · Fine Dining",rating:4.8,price:"$$$$",distance:"0.4 mi",vibe:"Candlelit · Intimate",   times:["6:00 PM","6:30 PM","7:00 PM","8:30 PM"],neighborhood:"W Midtown"},
+  {id:2,name:"Staplehouse",  cuisine:"New American",          rating:4.7,price:"$$$", distance:"0.8 mi",vibe:"Creative · Warm",        times:["5:30 PM","7:30 PM","8:00 PM"],          neighborhood:"Old Fourth Ward"},
+  {id:3,name:"Tiny Lou's",   cuisine:"French · Cocktails",    rating:4.6,price:"$$$", distance:"1.1 mi",vibe:"Romantic · Moody",       times:["6:00 PM","7:00 PM","9:00 PM"],          neighborhood:"Ponce City Mkt"},
+  {id:4,name:"Talat Market", cuisine:"Thai · Southeast Asian",rating:4.9,price:"$$",  distance:"1.4 mi",vibe:"Vibrant · Adventurous",  times:["5:45 PM","7:15 PM","8:45 PM"],          neighborhood:"Summerhill"},
+  {id:5,name:"The Optimist", cuisine:"Seafood · Southern",    rating:4.5,price:"$$$", distance:"0.6 mi",vibe:"Lively · Upscale Casual",times:["6:30 PM","7:00 PM","8:00 PM"],          neighborhood:"W Midtown"},
+  {id:6,name:"Kimura",       cuisine:"Japanese · Omakase",    rating:4.9,price:"$$$$",distance:"2.1 mi",vibe:"Serene · Exclusive",     times:["6:00 PM","8:30 PM"],                    neighborhood:"Buckhead"},
+];
+
+let profileIndex=0;
+
+const T={
+  bg:"#120d10",surface:"#1c1419",card:"#241a20",
+  border:"rgba(196,146,138,0.12)",cream:"#f5ece6",
+  muted:"#9a8880",accent:"#c4928a",rose:"#d4a0a8",
+  gold:"#c9a87a",lavender:"#b8aed4",text:"#ede0d8",
+};
+const serif="'Cormorant Garamond','Georgia',serif";
+const body ="'EB Garamond','Georgia',serif";
+const sans ="'Jost','system-ui',sans-serif";
+
+// Rose SVG for the i in Charisma
+const RoseI=()=>(
+  <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",position:"relative",width:"0.52em"}}>
+    <svg viewBox="0 0 32 52" style={{width:"0.52em",height:"0.85em",position:"relative",top:"0.02em",filter:"drop-shadow(0 2px 8px rgba(196,100,120,0.45))",overflow:"visible"}}>
+      <line x1="16" y1="28" x2="16" y2="52" stroke="#6b3a2a" strokeWidth="2.2" strokeLinecap="round"/>
+      <path d="M16 42 Q8 38 10 32 Q14 36 16 42Z" fill="#4a7c59" opacity="0.9"/>
+      <ellipse cx="16" cy="18" rx="7" ry="9" fill="#c4728a" opacity="0.55" transform="rotate(-20 16 18)"/>
+      <ellipse cx="16" cy="18" rx="7" ry="9" fill="#c4728a" opacity="0.55" transform="rotate(20 16 18)"/>
+      <ellipse cx="16" cy="18" rx="6" ry="9" fill="#d4889a" opacity="0.6" transform="rotate(70 16 18)"/>
+      <ellipse cx="16" cy="18" rx="6" ry="9" fill="#d4889a" opacity="0.6" transform="rotate(-70 16 18)"/>
+      <ellipse cx="16" cy="17" rx="5.5" ry="7.5" fill="#e0a0b0" opacity="0.75" transform="rotate(45 16 17)"/>
+      <ellipse cx="16" cy="17" rx="5.5" ry="7.5" fill="#e0a0b0" opacity="0.75" transform="rotate(-45 16 17)"/>
+      <ellipse cx="16" cy="16" rx="5" ry="7" fill="#ebb8c2" opacity="0.8"/>
+      <circle cx="16" cy="16" r="4.5" fill="#f5d0d8" opacity="0.9"/>
+      <circle cx="16" cy="16" r="2.5" fill="#e8b8c4"/>
+      <circle cx="14.5" cy="14.8" r="0.9" fill="rgba(255,255,255,0.6)"/>
+    </svg>
+  </span>
+);
+
+const FloatingGift=({gift,onDone})=>{
+  useEffect(()=>{const t=setTimeout(onDone,2600);return()=>clearTimeout(t);},[]);
+  return <div style={{position:"absolute",top:"20%",left:"50%",transform:"translateX(-50%)",fontSize:52,animation:"floatUp 2.6s ease-out forwards",pointerEvents:"none",zIndex:120}}>{gift.emoji}</div>;
+};
+
+const CountdownRing=({onDone})=>{
+  const [n,setN]=useState(3);
+  useEffect(()=>{
+    if(n===0){onDone();return;}
+    const t=setTimeout(()=>setN(c=>c-1),800);
+    return()=>clearTimeout(t);
+  },[n]);
+  return(
+    <div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(18,13,16,0.96)",backdropFilter:"blur(14px)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",animation:"fadeUp 0.4s ease"}}>
+      <p style={{fontFamily:serif,fontStyle:"italic",color:"rgba(212,176,160,0.6)",fontSize:16,letterSpacing:"0.18em",marginBottom:32}}>finding your match…</p>
+      <div style={{width:108,height:108,borderRadius:"50%",border:"1px solid rgba(196,146,138,0.25)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 0 60px rgba(196,146,138,0.12)"}}>
+        <span style={{fontFamily:serif,fontSize:52,fontWeight:300,color:"#d4b0a0",animation:"pop 0.4s ease"}}>{n||"❧"}</span>
+      </div>
+    </div>
+  );
+};
+
+const RestaurantCard=({r,selected,onSelect})=>(
+  <div onClick={()=>onSelect(r)} style={{borderRadius:16,padding:"15px 17px",cursor:"pointer",marginBottom:9,background:selected?"rgba(196,146,138,0.1)":"rgba(30,22,26,0.8)",border:selected?"1px solid rgba(196,146,138,0.45)":"1px solid rgba(196,146,138,0.1)",transition:"all 0.22s",boxShadow:selected?"0 4px 28px rgba(196,146,138,0.12)":"none"}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:7}}>
+      <div>
+        <div style={{fontFamily:serif,fontSize:15,fontWeight:600,color:T.cream,marginBottom:2}}>{r.name}</div>
+        <div style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:T.muted}}>{r.cuisine}</div>
+      </div>
+      <div style={{textAlign:"right"}}>
+        <div style={{fontFamily:sans,fontSize:12,color:"#c9a87a",fontWeight:600}}>★ {r.rating}</div>
+        <div style={{fontFamily:sans,fontSize:11,color:T.muted,marginTop:2}}>{r.price} · {r.distance}</div>
+      </div>
+    </div>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+      <span style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:"rgba(196,146,138,0.75)"}}>{r.vibe}</span>
+      <span style={{fontFamily:sans,fontSize:11,color:T.muted}}>{r.neighborhood}</span>
+    </div>
+  </div>
+);
+
+const TimeSlots=({times,selected,onSelect})=>(
+  <div style={{display:"flex",gap:7,flexWrap:"wrap",marginTop:12}}>
+    {times.map(t=>(
+      <button key={t} onClick={()=>onSelect(t)} className="btn" style={{padding:"7px 14px",borderRadius:100,fontSize:13,fontWeight:600,background:selected===t?"#c4928a":"rgba(196,146,138,0.08)",color:selected===t?"#fff":T.muted,border:selected===t?"none":"1px solid rgba(196,146,138,0.15)",transition:"all 0.18s"}}>{t}</button>
+    ))}
+  </div>
+);
+
+function App(){
+  const [screen,setScreen]=useState("home");
+  const [callTime,setCallTime]=useState(0);
+  const [blurAmount,setBlurAmount]=useState(22);
+  const [revealMsg,setRevealMsg]=useState(null);
+  const [coins,setCoins]=useState(1200);
+  const [profile,setProfile]=useState(PROFILES[0]);
+  const [kept,setKept]=useState([]);
+  const [showGifts,setShowGifts]=useState(false);
+  const [floating,setFloating]=useState([]);
+  const [sentGifts,setSentGifts]=useState([]);
+  const [pulseRing,setPulseRing]=useState(false);
+  const [selectedRest,setSelectedRest]=useState(null);
+  const [selectedTime,setSelectedTime]=useState(null);
+  const [bookingDate,setBookingDate]=useState("Tonight");
+  const [bookingParty,setBookingParty]=useState(2);
+  const [bookingDone,setBookingDone]=useState(false);
+  const timerRef=useRef(null);
+  const blurRef=useRef(null);
+
+  useEffect(()=>{
+    if(screen!=="call")return;
+    setCallTime(0);setBlurAmount(22);setRevealMsg(null);
+    timerRef.current=setInterval(()=>setCallTime(t=>t+1),1000);
+    blurRef.current=setInterval(()=>{
+      setBlurAmount(prev=>{
+        const next=Math.max(0,prev-0.18);
+        if(prev>0&&next===0)setRevealMsg("the moment has arrived");
+        return next;
+      });
+    },1000);
+    return()=>{clearInterval(timerRef.current);clearInterval(blurRef.current);};
+  },[screen,profile]);
+
+  useEffect(()=>{
+    if(!revealMsg)return;
+    const t=setTimeout(()=>setRevealMsg(null),3200);
+    return()=>clearTimeout(t);
+  },[revealMsg]);
+
+  const fmt=s=>`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
+
+  const sendGift=g=>{
+    if(coins<g.price)return;
+    setCoins(c=>c-g.price);
+    setSentGifts(p=>[...p,g]);
+    setFloating(p=>[...p,{...g,key:Date.now()}]);
+    setPulseRing(true);
+    setTimeout(()=>setPulseRing(false),900);
+  };
+
+  const startOver=()=>{
+    profileIndex=0;
+    setProfile(PROFILES[profileIndex]);
+    setSentGifts([]);setShowGifts(false);
+    setSelectedRest(null);setSelectedTime(null);setBookingDone(false);
+    setScreen("connecting");
+  };
+
+  const goNext=()=>{
+    clearInterval(timerRef.current);clearInterval(blurRef.current);
+    profileIndex=(profileIndex+1)%PROFILES.length;
+    setProfile(PROFILES[profileIndex]);
+    setSentGifts([]);setFloating([]);setShowGifts(false);
+    setScreen("connecting");
+  };
+
+  const goKeep=()=>{
+    clearInterval(timerRef.current);clearInterval(blurRef.current);
+    setKept(p=>[...p,profile]);
+    setShowGifts(false);
+    setSelectedRest(null);setSelectedTime(null);setBookingDone(false);
+    setScreen("end");
+  };
+
+  return(
+    <div style={{minHeight:"100vh",background:T.bg,fontFamily:body,color:T.text,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",overflow:"hidden",position:"relative"}}>
+
+      {/* blobs */}
+      <div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:0,overflow:"hidden"}}>
+        <div style={{position:"absolute",width:600,height:600,borderRadius:"60% 40% 55% 45%/50% 58% 42% 50%",background:"radial-gradient(ellipse,rgba(196,146,138,0.07) 0%,transparent 65%)",top:"-180px",left:"-200px",animation:"blobDrift 16s ease-in-out infinite"}}/>
+        <div style={{position:"absolute",width:450,height:450,borderRadius:"45% 55% 40% 60%/55% 42% 58% 45%",background:"radial-gradient(ellipse,rgba(184,174,212,0.06) 0%,transparent 65%)",bottom:"-120px",right:"-150px",animation:"blobDrift 20s ease-in-out infinite reverse"}}/>
+        <div style={{position:"absolute",width:320,height:320,borderRadius:"52% 48% 44% 56%/48% 56% 44% 52%",background:"radial-gradient(ellipse,rgba(201,168,122,0.05) 0%,transparent 65%)",top:"38%",right:"5%",animation:"blobDrift 24s ease-in-out infinite 6s"}}/>
+        <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse 100% 100% at 50% 50%,transparent 40%,rgba(18,13,16,0.55) 100%)"}}/>
+      </div>
+
+      {screen==="connecting"&&<CountdownRing onDone={()=>setScreen("call")}/>}
+
+      <div style={{position:"relative",zIndex:1,width:"100%",maxWidth:400,padding:"0 20px"}}>
+
+        {/* ── HOME ── */}
+        {screen==="home"&&(
+          <div style={{animation:"fadeUp 0.6s ease",textAlign:"center"}}>
+            <div style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:"rgba(196,146,138,0.45)",letterSpacing:"0.22em",marginBottom:8}}>— where attraction begins —</div>
+            <h1 style={{fontFamily:serif,fontSize:88,fontWeight:300,lineHeight:0.88,color:T.cream,marginBottom:10,letterSpacing:"-0.02em",textShadow:"0 2px 60px rgba(196,146,138,0.18)",display:"flex",alignItems:"center",justifyContent:"center",gap:0}}>
+              <span>Char</span><RoseI/><span>sma</span>
+            </h1>
+            <div style={{display:"flex",alignItems:"center",gap:12,justifyContent:"center",marginBottom:18}}>
+              <div style={{width:40,height:"1px",background:"rgba(196,146,138,0.25)"}}/>
+              <span style={{color:"rgba(196,146,138,0.4)",fontSize:14}}>❧</span>
+              <div style={{width:40,height:"1px",background:"rgba(196,146,138,0.25)"}}/>
+            </div>
+            <p style={{fontFamily:body,fontStyle:"italic",fontSize:16,color:T.muted,lineHeight:1.7,marginBottom:40}}>
+              No profiles. No swiping.<br/>Just your voice, your presence,<br/>and the slow reveal.
+            </p>
+            <div style={{display:"inline-flex",alignItems:"center",gap:9,padding:"9px 22px",borderRadius:100,background:"rgba(201,168,122,0.08)",border:"1px solid rgba(201,168,122,0.22)",marginBottom:36,fontSize:13,color:T.gold,fontFamily:sans,fontWeight:500,letterSpacing:"0.06em"}}>❧ {coins.toLocaleString()} grace points</div>
+            <div className="glass" style={{padding:"22px 24px",marginBottom:30,textAlign:"left"}}>
+              <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.28em",color:"rgba(196,146,138,0.45)",textTransform:"uppercase",marginBottom:18}}>The experience</p>
+              {[
+                ["❧","Instant connection","Drop into a live call — no waiting, no accepting"],
+                ["◑","The slow reveal","Two minutes of voice & energy before they unblur"],
+                ["🌸","Send a grace gift","A gentle way to show you're feeling the connection"],
+                ["📍","Book the evening","After a match, reserve a table together in the app"],
+              ].map(([ic,ttl,desc])=>(
+                <div key={ttl} style={{display:"flex",gap:14,marginBottom:14,alignItems:"flex-start"}}>
+                  <span style={{fontSize:15,color:T.rose,lineHeight:1.4,minWidth:18}}>{ic}</span>
+                  <div>
+                    <div style={{fontFamily:sans,fontWeight:600,fontSize:13,color:T.cream,marginBottom:2}}>{ttl}</div>
+                    <div style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted,lineHeight:1.5}}>{desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {kept.length>0&&(
+              <div style={{display:"flex",alignItems:"center",gap:10,justifyContent:"center",marginBottom:22}}>
+                <span style={{fontFamily:body,fontStyle:"italic",color:T.muted,fontSize:13}}>kept:</span>
+                {kept.map((p,i)=>(
+                  <div key={i} style={{width:32,height:32,borderRadius:"50%",background:`radial-gradient(circle at 35% 35%,${p.hue}ee,${p.hue}44)`,border:`1px solid ${p.hue}55`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:serif,fontSize:13,fontWeight:600,color:T.cream,boxShadow:`0 0 12px ${p.hue}33`}}>{p.avatar}</div>
+                ))}
+              </div>
+            )}
+            <button className="btn" onClick={startOver} style={{width:"100%",padding:"18px 0",borderRadius:14,fontSize:15,color:T.cream,letterSpacing:"0.08em",background:"linear-gradient(145deg,#c4928a,#a06870)",boxShadow:"0 8px 40px rgba(196,146,138,0.3)",marginBottom:12}}>Begin ❧</button>
+            <p style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:"rgba(154,136,128,0.4)"}}>your camera opens immediately</p>
+          </div>
+        )}
+
+        {/* ── CALL ── */}
+        {screen==="call"&&(
+          <div style={{animation:"fadeUp 0.35s ease",position:"relative"}}>
+            {floating.map(g=>(
+              <FloatingGift key={g.key} gift={g} onDone={()=>setFloating(f=>f.filter(x=>x.key!==g.key))}/>
+            ))}
+            {revealMsg&&(
+              <div style={{position:"absolute",top:-46,left:"50%",padding:"9px 24px",borderRadius:100,zIndex:130,background:"rgba(196,146,138,0.88)",backdropFilter:"blur(10px)",fontFamily:body,fontStyle:"italic",fontSize:14,color:"#fff",animation:"revealFloat 3.2s ease forwards",whiteSpace:"nowrap",letterSpacing:"0.04em"}}>{revealMsg}</div>
+            )}
+            <div style={{width:"100%",aspectRatio:"9/16",borderRadius:24,overflow:"hidden",background:`linear-gradient(175deg,${profile.hue}14 0%,${T.surface} 50%,${T.bg} 100%)`,border:pulseRing?"1px solid rgba(196,146,138,0.5)":"1px solid rgba(196,146,138,0.1)",position:"relative",marginBottom:12,boxShadow:pulseRing?"0 0 50px rgba(196,146,138,0.2),0 16px 60px rgba(0,0,0,0.6)":"0 16px 60px rgba(0,0,0,0.55)",transition:"border 0.5s,box-shadow 0.5s"}}>
+              {/* blurred avatar */}
+              <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-60%)",width:118,height:118,borderRadius:"50%",background:`radial-gradient(circle at 35% 35%,${profile.hue}ee,${profile.hue}55)`,border:`2px solid ${profile.hue}44`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:serif,fontSize:50,fontWeight:300,color:T.cream,filter:`blur(${blurAmount*0.32}px)`,transition:"filter 1.4s ease,box-shadow 1.2s ease",boxShadow:blurAmount===0?`0 0 80px ${profile.hue}55,0 0 0 10px ${profile.hue}18`:`0 0 50px ${profile.hue}28`}}>{profile.avatar}</div>
+              {/* reveal bar */}
+              <div style={{position:"absolute",top:"67%",left:"50%",transform:"translateX(-50%)",width:130,textAlign:"center"}}>
+                {blurAmount>0?(
+                  <>
+                    <div style={{width:"100%",height:2,borderRadius:100,background:"rgba(196,146,138,0.12)",marginBottom:8,overflow:"hidden"}}>
+                      <div style={{height:"100%",borderRadius:100,background:"linear-gradient(90deg,#c4928a,#d4a0a8)",width:`${100-(blurAmount/22)*100}%`,transition:"width 1s linear"}}/>
+                    </div>
+                    <span style={{fontFamily:body,fontStyle:"italic",fontSize:11,color:"rgba(196,146,138,0.38)"}}>revealing in {Math.ceil(blurAmount/0.18)}s</span>
+                  </>
+                ):(
+                  <span style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:"rgba(196,146,138,0.7)",letterSpacing:"0.06em"}}>❧ revealed</span>
+                )}
+              </div>
+              {/* LIVE pill */}
+              <div style={{position:"absolute",top:16,left:16,display:"flex",alignItems:"center",gap:6,padding:"5px 13px",borderRadius:100,background:"rgba(18,13,16,0.7)",backdropFilter:"blur(8px)",border:"1px solid rgba(196,146,138,0.2)",fontFamily:sans,fontSize:10,fontWeight:600,letterSpacing:"0.18em",color:"rgba(196,146,138,0.7)"}}>
+                <span style={{width:5,height:5,borderRadius:"50%",background:T.rose,animation:"liveGlow 1.6s ease-in-out infinite",display:"inline-block"}}/>
+                LIVE
+              </div>
+              {/* timer */}
+              <div style={{position:"absolute",top:16,right:16,padding:"5px 13px",borderRadius:100,background:"rgba(18,13,16,0.6)",backdropFilter:"blur(8px)",border:"1px solid rgba(196,146,138,0.1)",fontFamily:sans,fontSize:12,fontWeight:400,color:T.muted}}>{fmt(callTime)}</div>
+              {/* name */}
+              <div style={{position:"absolute",bottom:22,left:18,padding:"12px 18px",borderRadius:14,background:"rgba(18,13,16,0.75)",backdropFilter:"blur(14px)",border:"1px solid rgba(196,146,138,0.1)"}}>
+                <div style={{fontFamily:serif,fontWeight:400,fontSize:19,color:T.cream}}>{profile.name}, {profile.age}</div>
+                <div style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:T.muted,marginTop:3}}>{profile.city} · {profile.vibe}</div>
+              </div>
+              {sentGifts.length>0&&(
+                <div style={{position:"absolute",bottom:26,right:14,display:"flex",flexDirection:"column",gap:4,alignItems:"flex-end"}}>
+                  {sentGifts.slice(-4).map((g,i)=><span key={i} style={{fontSize:19,filter:"drop-shadow(0 2px 6px rgba(0,0,0,0.7))"}}>{g.emoji}</span>)}
+                </div>
+              )}
+            </div>
+            {/* self PIP */}
+            <div style={{position:"absolute",top:60,right:28,width:80,height:108,borderRadius:13,background:`linear-gradient(160deg,${T.card},${T.surface})`,border:"1px solid rgba(196,146,138,0.14)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,color:"rgba(154,136,128,0.28)",backdropFilter:"blur(10px)",zIndex:10,boxShadow:"0 4px 28px rgba(0,0,0,0.55)"}}>👤</div>
+            {/* controls */}
+            <div style={{display:"flex",gap:8,marginBottom:8}}>
+              <button className="btn" onClick={goNext} style={{flex:1,padding:"15px 0",borderRadius:13,fontSize:13,color:T.muted,background:T.card,border:`1px solid ${T.border}`,letterSpacing:"0.05em"}}>pass ⟶</button>
+              <button className="btn" onClick={()=>setShowGifts(!showGifts)} style={{flex:1,padding:"15px 0",borderRadius:13,fontSize:13,color:T.gold,background:showGifts?"rgba(201,168,122,0.14)":"rgba(201,168,122,0.07)",border:`1px solid rgba(201,168,122,${showGifts?"0.35":"0.16"})`,letterSpacing:"0.05em"}}>🌸 gift</button>
+              <button className="btn" onClick={goKeep} style={{flex:1,padding:"15px 0",borderRadius:13,fontSize:13,color:T.cream,background:"linear-gradient(145deg,#c4928a,#a06870)",boxShadow:"0 4px 24px rgba(196,146,138,0.28)",letterSpacing:"0.05em"}}>keep ❧</button>
+            </div>
+            {showGifts&&(
+              <div className="glass" style={{padding:18,animation:"fadeUp 0.22s ease"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+                  <span style={{fontFamily:serif,fontStyle:"italic",fontSize:16,color:T.cream}}>a grace gift</span>
+                  <span style={{fontFamily:sans,fontSize:13,fontWeight:500,color:T.gold}}>❧ {coins.toLocaleString()}</span>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+                  {GIFTS.map(g=>{
+                    const ok=coins>=g.price;
+                    return(
+                      <button key={g.id} className="btn" onClick={()=>sendGift(g)} style={{padding:"12px 6px",borderRadius:13,textAlign:"center",color:T.cream,background:ok?`${g.color}15`:"rgba(255,255,255,0.02)",border:`1px solid ${ok?g.color+"3a":"rgba(196,146,138,0.08)"}`,opacity:ok?1:0.28}}>
+                        <div style={{fontSize:22,marginBottom:5}}>{g.emoji}</div>
+                        <div style={{fontFamily:sans,fontSize:11,fontWeight:500}}>{g.name}</div>
+                        <div style={{fontFamily:sans,fontSize:11,color:T.gold,marginTop:3}}>❧ {g.price}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── END / MATCH ── */}
+        {screen==="end"&&!bookingDone&&(
+          <div style={{animation:"fadeUp 0.5s ease"}}>
+            <div style={{textAlign:"center",marginBottom:26}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,justifyContent:"center",marginBottom:14}}>
+                <div style={{width:50,height:"1px",background:"rgba(196,146,138,0.3)"}}/>
+                <span style={{color:T.rose,fontSize:20,animation:"pop 0.5s ease"}}>❧</span>
+                <div style={{width:50,height:"1px",background:"rgba(196,146,138,0.3)"}}/>
+              </div>
+              <h2 style={{fontFamily:serif,fontSize:34,fontWeight:300,color:T.cream,marginBottom:8}}>You kept {profile.name}</h2>
+              <p style={{fontFamily:body,fontStyle:"italic",color:T.muted,fontSize:14,lineHeight:1.7}}>
+                When they keep you back, it becomes<br/><span style={{color:T.rose}}>something worth pursuing.</span>
+              </p>
+              {sentGifts.length>0&&<p style={{fontFamily:sans,fontSize:12,color:T.gold,marginTop:10}}>{sentGifts.map(g=>g.emoji).join("  ")}</p>}
+            </div>
+            <div className="glass" style={{padding:"16px 18px",marginBottom:12}}>
+              <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.24em",color:"rgba(196,146,138,0.4)",textTransform:"uppercase",marginBottom:12}}>Plan the evening</p>
+              <div style={{display:"flex",gap:7,marginBottom:12}}>
+                {["Tonight","Tomorrow","This Weekend"].map(d=>(
+                  <button key={d} onClick={()=>setBookingDate(d)} className="btn" style={{flex:1,padding:"9px 4px",borderRadius:10,fontSize:12,fontWeight:500,background:bookingDate===d?"#c4928a":"rgba(196,146,138,0.07)",color:bookingDate===d?"#fff":T.muted,border:bookingDate===d?"none":"1px solid rgba(196,146,138,0.12)",transition:"all 0.2s"}}>{d}</button>
+                ))}
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <span style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted}}>Party of</span>
+                {[2,3,4].map(n=>(
+                  <button key={n} onClick={()=>setBookingParty(n)} className="btn" style={{width:34,height:34,borderRadius:"50%",fontSize:14,fontWeight:600,background:bookingParty===n?"#c4928a":"rgba(196,146,138,0.07)",color:bookingParty===n?"#fff":T.muted,border:bookingParty===n?"none":"1px solid rgba(196,146,138,0.12)",transition:"all 0.2s"}}>{n}</button>
+                ))}
+              </div>
+            </div>
+            <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.24em",color:"rgba(196,146,138,0.4)",textTransform:"uppercase",marginBottom:10}}>Nearby · {profile.city}</p>
+            <div className="scroll-thin" style={{maxHeight:290,overflowY:"auto",paddingRight:2}}>
+              {RESTAURANTS.map(r=>(
+                <RestaurantCard key={r.id} r={r} selected={selectedRest?.id===r.id} onSelect={r=>{setSelectedRest(r);setSelectedTime(null);}}/>
+              ))}
+            </div>
+            {selectedRest&&(
+              <div className="glass" style={{padding:"16px 18px",marginTop:10,animation:"fadeUp 0.2s ease"}}>
+                <p style={{fontFamily:serif,fontStyle:"italic",fontSize:15,color:T.cream,marginBottom:2}}>{selectedRest.name}</p>
+                <p style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:T.muted,marginBottom:2}}>Choose a time for {bookingDate.toLowerCase()}</p>
+                <TimeSlots times={selectedRest.times} selected={selectedTime} onSelect={setSelectedTime}/>
+              </div>
+            )}
+            {selectedRest&&selectedTime&&(
+              <button className="btn" onClick={()=>setBookingDone(true)} style={{width:"100%",marginTop:12,padding:"17px 0",borderRadius:14,fontSize:14,color:T.cream,letterSpacing:"0.07em",background:"linear-gradient(145deg,#c4928a,#a06870)",boxShadow:"0 6px 32px rgba(196,146,138,0.28)",animation:"fadeUp 0.25s ease"}}>
+                Reserve · {bookingParty} guests · {selectedTime} ❧
+              </button>
+            )}
+            <div style={{display:"flex",gap:8,marginTop:11}}>
+              <button className="btn" onClick={startOver} style={{flex:1,padding:"13px 0",borderRadius:13,fontSize:13,color:T.cream,background:T.card,border:`1px solid ${T.border}`,letterSpacing:"0.04em"}}>Continue</button>
+              <button className="btn" onClick={()=>setScreen("home")} style={{flex:1,padding:"13px 0",borderRadius:13,fontSize:13,color:T.muted,background:"transparent",border:"1px solid rgba(196,146,138,0.08)",fontFamily:body,fontStyle:"italic"}}>Back home</button>
+            </div>
+          </div>
+        )}
+
+        {/* ── BOOKING CONFIRMED ── */}
+        {screen==="end"&&bookingDone&&(
+          <div style={{textAlign:"center",animation:"fadeUp 0.5s ease"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,justifyContent:"center",marginBottom:18}}>
+              <div style={{width:40,height:"1px",background:"rgba(196,146,138,0.25)"}}/>
+              <span style={{color:T.rose,fontSize:22,animation:"pop 0.5s ease"}}>❧</span>
+              <div style={{width:40,height:"1px",background:"rgba(196,146,138,0.25)"}}/>
+            </div>
+            <h2 style={{fontFamily:serif,fontSize:30,fontWeight:300,color:T.cream,marginBottom:8}}>The evening is set.</h2>
+            <p style={{fontFamily:body,fontStyle:"italic",color:T.muted,fontSize:14,lineHeight:1.8,marginBottom:28}}>
+              Reservation request sent to<br/>
+              <strong style={{fontFamily:serif,color:T.cream,fontStyle:"normal",fontWeight:400}}>{selectedRest?.name}</strong><br/>
+              <span style={{fontSize:13}}>{bookingDate} · {selectedTime} · party of {bookingParty}</span>
+            </p>
+            <div className="glass" style={{padding:"18px 22px",marginBottom:24,textAlign:"left"}}>
+              <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.24em",color:"rgba(196,146,138,0.4)",textTransform:"uppercase",marginBottom:14}}>Reservation details</p>
+              {[["Where",selectedRest?.name],["When",`${bookingDate} at ${selectedTime}`],["Guests",`${bookingParty} people`],["Status","Awaiting confirmation"]].map(([lbl,val])=>(
+                <div key={lbl} style={{display:"flex",justifyContent:"space-between",marginBottom:10,alignItems:"baseline"}}>
+                  <span style={{fontFamily:sans,fontSize:11,color:T.muted,letterSpacing:"0.06em"}}>{lbl}</span>
+                  <span style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.cream}}>{val}</span>
+                </div>
+              ))}
+            </div>
+            <button className="btn" onClick={startOver} style={{width:"100%",padding:"16px 0",borderRadius:13,fontSize:14,color:T.cream,background:"linear-gradient(145deg,#c4928a,#a06870)",boxShadow:"0 6px 32px rgba(196,146,138,0.25)",letterSpacing:"0.07em",marginBottom:10}}>Continue ❧</button>
+            <button className="btn" onClick={()=>setScreen("home")} style={{width:"100%",padding:"12px 0",borderRadius:13,fontSize:13,color:T.muted,background:"transparent",border:"none",fontFamily:body,fontStyle:"italic"}}>Back home</button>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
