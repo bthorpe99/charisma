@@ -62,6 +62,185 @@ const RESTAURANTS=[
   {id:5,name:"The Optimist", cuisine:"Seafood · Southern",    rating:4.5,price:"$$$", distance:"0.6 mi",vibe:"Lively · Upscale Casual",times:["6:30 PM","7:00 PM","8:00 PM"],          neighborhood:"W Midtown"},
   {id:6,name:"Kimura",       cuisine:"Japanese · Omakase",    rating:4.9,price:"$$$$",distance:"2.1 mi",vibe:"Serene · Exclusive",     times:["6:00 PM","8:30 PM"],                    neighborhood:"Buckhead"},
 ];
+const CALL_QUESTIONS=[
+  "What time would you be ready?",
+  "Where are we going?",
+  "What type of food do you actually like?",
+  "Are you comfortable going Dutch and splitting the tab?",
+  "What kind of vibe do you want tonight: relaxed, romantic, or lively?",
+  "After dinner, are we doing drinks or calling it a night?",
+  "Are you picking the place, or am I trusting my own taste tonight?",
+  "Do you want somewhere quiet enough to actually talk?",
+  "What is your ideal first-date budget?",
+  "Are you more dinner, dessert, or drinks?",
+  "Would you rather meet early or be fashionably late together?",
+  "Do you already have an outfit in mind?",
+  "Are we doing casual, cute, or grown and elegant?",
+  "How far are you willing to drive for a good date?",
+  "Should we stay close to my side of town or yours?",
+  "Do you care more about the food or the atmosphere?",
+  "What food are you absolutely not eating tonight?",
+  "Are you allergic to anything I should know before we book?",
+  "Are you adventurous with food, or do you play it safe?",
+  "Do you like spicy food, or will I be watching you suffer?",
+  "Are you a seafood person?",
+  "Are you into sushi, or is that a hard no?",
+  "Would you do tacos and margaritas?",
+  "Would you do steakhouse energy?",
+  "Would you do a rooftop spot?",
+  "Would you do a hidden lounge or speakeasy?",
+  "Would you rather try somewhere new or go somewhere reliable?",
+  "Do you want a reservation, or are we freestyling?",
+  "Should I expect flowers, or are we keeping it simple?",
+  "Are you opening doors, or should I stretch first?",
+  "Are you the type to plan the whole night?",
+  "Do you like when someone takes the lead on a date?",
+  "Should I send you my location before I leave?",
+  "Are you okay confirming when you arrive?",
+  "Do you prefer meeting there or being picked up?",
+  "If you pick me up, is your car clean enough for inspection?",
+  "Are we talking full date or quick vibe check?",
+  "How long do you usually like a first date to last?",
+  "What makes you feel comfortable on a first date?",
+  "What makes you lose interest on a first date?",
+  "Are phones away at the table, or are we both guilty?",
+  "Are you taking pictures of the food or pretending you do not?",
+  "Do you like sharing plates?",
+  "Are you ordering for yourself or asking what I recommend?",
+  "Do you want appetizers, or are we acting responsible?",
+  "Are we getting dessert if the date is good?",
+  "What drink are you ordering first?",
+  "Are you a mocktail, cocktail, wine, or water person tonight?",
+  "Do you need parking to be easy?",
+  "Do you care if there is a dress code?",
+  "Are you okay with a place that gets a little loud?",
+  "Would you rather sit at a table or the bar?",
+  "Are we sitting inside or outside if the weather is nice?",
+  "Do you want romantic lighting or actual visibility?",
+  "Are you trying to impress me or relax with me?",
+  "What is one thing you hope I ask you in person?",
+  "What question should I not ask on the first date?",
+  "Do you like deep conversation early, or should I pace myself?",
+  "Are you more playful or serious on a first date?",
+  "Can you handle a little sarcasm?",
+  "Are you funny in person, or was that only over text?",
+  "What is your green flag on a date?",
+  "What is your red flag at dinner?",
+  "How do you feel about splitting the check if we both had a good time?",
+  "If you invite me out, are you treating or are we splitting?",
+  "Are we doing Dutch from the start so nobody acts surprised?",
+  "Would you be offended if I offered to split?",
+  "If I pay for dessert, are you paying for the next round?",
+  "Are you generous, practical, or mysteriously unavailable when the bill comes?",
+  "Should we decide the tab situation before the waiter appears?",
+  "Do you believe whoever plans it should pay?",
+  "Do you like old-school dating rules or modern dating rules?",
+  "Are you comfortable talking money expectations before the date?",
+  "What time should I realistically start getting ready?",
+  "How much notice do you need before meeting?",
+  "Are you a same-day date person?",
+  "Would you rather plan for tonight or tomorrow?",
+  "What day of the week is best for you?",
+  "Are weekends your date nights or your recovery days?",
+  "Do you work early tomorrow?",
+  "What time do you need to be home?",
+  "Do you have a hard curfew, or are you grown grown?",
+  "Are you okay with a late dinner?",
+  "Would brunch be better than dinner?",
+  "Are you a coffee-date person or is that too low effort?",
+  "Would you do breakfast, or is that relationship energy?",
+  "Do you prefer a quick first meet before a real date?",
+  "Are we dressing for comfort or compliments?",
+  "What color should I wear if I want your attention?",
+  "Are you complimenting my outfit, or should I schedule that myself?",
+  "Do you care about cologne, or can it be subtle?",
+  "What is too much perfume on a date?",
+  "Are you punctual, or should I bring patience?",
+  "If you are late, are you texting updates?",
+  "How late is too late before I order without you?",
+  "Do you like a person who confirms plans twice?",
+  "Should we confirm the plan an hour before?",
+  "What is your favorite kind of restaurant energy?",
+  "Are you into live music during dinner?",
+  "Would you do karaoke after dinner, or is that a threat?",
+  "Would you go dancing if the vibe is right?",
+  "Are you competitive enough for bowling or games?",
+  "Would an arcade date make you laugh or leave?",
+  "Would you do a walk after dinner?",
+  "Are you comfortable with a public first date only?",
+  "Do you prefer well-lit places for a first meet?",
+  "What neighborhood feels easiest for you?",
+  "What area should we avoid tonight?",
+  "Should we pick somewhere between both of us?",
+  "Do you want me to choose from three options?",
+  "If I send three restaurants, are you actually picking one?",
+  "Are you picky, decisive, or beautifully complicated?",
+  "Do you want the menu sent before we go?",
+  "Are you checking reviews, or trusting the vibe?",
+  "What rating is too low for you?",
+  "Would you rather have amazing food with average service or average food with amazing service?",
+  "Are we ordering the same thing if it looks good?",
+  "Do you judge people by how they treat the server?",
+  "Do you like when someone makes a reservation under their name?",
+  "Should the reservation be under your name or mine?",
+  "Are you okay if I choose a place with a cancellation fee?",
+  "Do you want something low-pressure first?",
+  "Would you rather talk dreams, travel, family, or food first?",
+  "What is one thing I should know before meeting you?",
+  "What makes you feel respected on a date?",
+  "What makes a date feel intentional to you?",
+  "Are you dating for fun, serious, or seeing where it goes?",
+  "What pace feels good for you?",
+  "Do you like texting after the date the same night?",
+  "If the date goes well, are we planning date two before leaving?",
+  "What would make you say yes to a second date?",
+  "What is your ideal goodbye: hug, cheek kiss, or keep it classy?",
+  "Are you okay with me asking before making a move?",
+  "Do you like direct communication?",
+  "Should we be honest if the chemistry is not there?",
+  "What is one thing that would make you laugh tonight?",
+  "What is the easiest way to impress you without doing too much?",
+  "Are you more impressed by planning or spontaneity?",
+  "Do you want the date to feel romantic or just natural?",
+  "Are you okay with me being a little nervous?",
+  "What are you hoping this call tells you about me?",
+  "What do you need to hear before agreeing to meet?",
+  "Are you comfortable sharing your general area before booking?",
+  "Should location stay approximate until plans are confirmed?",
+  "Do you want matches only in your selected region?",
+  "Do you want to meet people who speak your chosen language first?",
+  "Would you date someone bilingual?",
+  "Should the date happen in your preferred language?",
+  "Are you okay switching languages if we both can?",
+  "What language feels most natural when you are flirting?",
+  "What region should your date understand culturally?",
+  "Do you prefer someone local or someone willing to travel?",
+  "How close is too close to home for a first date?",
+  "How far is too far for a first date?",
+  "Are we planning around traffic or pretending traffic does not exist?",
+  "Do you need the place to be easy to find?",
+  "Should we choose somewhere with valet, parking, or rideshare access?",
+  "Are you taking Uber, driving, or making me guess?",
+  "Should we share arrival updates in the app?",
+  "Do you want the app to confirm we both arrived?",
+  "Should the app remind us about the reservation?",
+  "Would you like a safety check-in before the date?",
+  "Would you like a check-in after the date?",
+  "Do you want to confirm plans before camera reveal finishes?",
+  "Are you ready to pick a place if the chemistry is there?"
+];
+const LANGUAGES=[
+  {id:"en",name:"English"},
+  {id:"es",name:"Spanish"},
+  {id:"fr",name:"French"},
+  {id:"pt",name:"Portuguese"}
+];
+const REGIONS_BY_LANGUAGE={
+  en:["United States","Canada","United Kingdom","Australia"],
+  es:["Mexico","Puerto Rico","Dominican Republic","Colombia"],
+  fr:["France","Canada - Quebec","Haiti","Senegal"],
+  pt:["Brazil","Portugal","Angola","Cape Verde"]
+};
 
 let profileIndex=0;
 
@@ -161,8 +340,17 @@ function App(){
   const [bookingDate,setBookingDate]=useState("Tonight");
   const [bookingParty,setBookingParty]=useState(2);
   const [bookingDone,setBookingDone]=useState(false);
+  const [cameraStatus,setCameraStatus]=useState("idle");
+  const [cameraError,setCameraError]=useState("");
+  const [language,setLanguage]=useState("");
+  const [region,setRegion]=useState("");
+  const [locationStatus,setLocationStatus]=useState("idle");
+  const [locationError,setLocationError]=useState("");
+  const [location,setLocation]=useState(null);
   const timerRef=useRef(null);
   const blurRef=useRef(null);
+  const videoRef=useRef(null);
+  const streamRef=useRef(null);
 
   useEffect(()=>{
     if(screen!=="call")return;
@@ -184,7 +372,75 @@ function App(){
     return()=>clearTimeout(t);
   },[revealMsg]);
 
+  useEffect(()=>{
+    if(videoRef.current&&streamRef.current){
+      videoRef.current.srcObject=streamRef.current;
+    }
+  },[screen,cameraStatus]);
+
   const fmt=s=>`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
+
+  const stopCamera=()=>{
+    if(streamRef.current){
+      streamRef.current.getTracks().forEach(track=>track.stop());
+      streamRef.current=null;
+    }
+    if(videoRef.current)videoRef.current.srcObject=null;
+    setCameraStatus("idle");
+  };
+
+  const startCamera=async()=>{
+    if(!navigator.mediaDevices?.getUserMedia){
+      setCameraStatus("error");
+      setCameraError("Camera preview is not supported in this browser.");
+      return false;
+    }
+    setCameraStatus("requesting");
+    setCameraError("");
+    try{
+      const stream=await navigator.mediaDevices.getUserMedia({
+        video:{facingMode:"user",width:{ideal:640},height:{ideal:960}},
+        audio:false
+      });
+      streamRef.current=stream;
+      if(videoRef.current)videoRef.current.srcObject=stream;
+      setCameraStatus("live");
+      return true;
+    }catch(err){
+      setCameraStatus("error");
+      setCameraError(err?.name==="NotAllowedError"?"Camera permission was blocked. Allow camera access in the browser to preview yourself.":"Could not open the camera on this device.");
+      return false;
+    }
+  };
+
+  const confirmLocation=async()=>{
+    if(!navigator.geolocation){
+      setLocationStatus("error");
+      setLocationError("Location is not supported in this browser.");
+      return false;
+    }
+    setLocationStatus("requesting");
+    setLocationError("");
+    return new Promise(resolve=>{
+      navigator.geolocation.getCurrentPosition(
+        pos=>{
+          setLocation({
+            lat:pos.coords.latitude,
+            lng:pos.coords.longitude,
+            accuracy:pos.coords.accuracy
+          });
+          setLocationStatus("confirmed");
+          resolve(true);
+        },
+        err=>{
+          setLocationStatus("error");
+          setLocationError(err?.code===1?"Location permission was blocked. Allow location access to confirm your region before matching.":"Could not confirm your location. Try again before starting.");
+          resolve(false);
+        },
+        {enableHighAccuracy:false,timeout:10000,maximumAge:300000}
+      );
+    });
+  };
 
   const sendGift=g=>{
     if(coins<g.price)return;
@@ -195,7 +451,8 @@ function App(){
     setTimeout(()=>setPulseRing(false),900);
   };
 
-  const startOver=()=>{
+  const startOver=async()=>{
+    if(!language||!region||locationStatus!=="confirmed"||cameraStatus!=="live")return;
     profileIndex=0;
     setProfile(PROFILES[profileIndex]);
     setSentGifts([]);setShowGifts(false);
@@ -213,11 +470,25 @@ function App(){
 
   const goKeep=()=>{
     clearInterval(timerRef.current);clearInterval(blurRef.current);
+    stopCamera();
     setKept(p=>[...p,profile]);
     setShowGifts(false);
     setSelectedRest(null);setSelectedTime(null);setBookingDone(false);
     setScreen("end");
   };
+
+  const goHome=()=>{
+    clearInterval(timerRef.current);clearInterval(blurRef.current);
+    stopCamera();
+    setScreen("home");
+  };
+
+  const activeQuestionIndex=Math.floor(callTime/8)%CALL_QUESTIONS.length;
+  const activeQuestion=CALL_QUESTIONS[activeQuestionIndex];
+  const selectedLanguage=LANGUAGES.find(l=>l.id===language);
+  const availableRegions=language?REGIONS_BY_LANGUAGE[language]:[];
+  const setupComplete=Boolean(language&&region&&locationStatus==="confirmed"&&cameraStatus==="live");
+  const locationLabel=location?`${location.lat.toFixed(2)}, ${location.lng.toFixed(2)}`:"";
 
   return(
     <div style={{minHeight:"100vh",background:T.bg,fontFamily:body,color:T.text,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",overflow:"hidden",position:"relative"}}>
@@ -267,6 +538,37 @@ function App(){
                 </div>
               ))}
             </div>
+            <div className="glass" style={{padding:"18px 18px",marginBottom:22,textAlign:"left"}}>
+              <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.24em",color:"rgba(196,146,138,0.45)",textTransform:"uppercase",marginBottom:12}}>Match setup</p>
+              <div style={{marginBottom:14}}>
+                <div style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted,marginBottom:8}}>Choose your language</div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8}}>
+                  {LANGUAGES.map(l=>(
+                    <button key={l.id} className="btn" onClick={()=>{setLanguage(l.id);setRegion("");}} style={{padding:"10px 8px",borderRadius:11,fontSize:12,background:language===l.id?"rgba(196,146,138,0.18)":"rgba(196,146,138,0.06)",border:language===l.id?"1px solid rgba(196,146,138,0.5)":"1px solid rgba(196,146,138,0.12)",color:language===l.id?T.cream:T.muted}}>{l.name}</button>
+                  ))}
+                </div>
+              </div>
+              <div style={{marginBottom:14,opacity:language?1:0.45}}>
+                <div style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted,marginBottom:8}}>Choose your region</div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8}}>
+                  {(availableRegions.length?availableRegions:["Pick language first"]).map(r=>(
+                    <button key={r} disabled={!language} className="btn" onClick={()=>setRegion(r)} style={{padding:"10px 8px",borderRadius:11,fontSize:11,background:region===r?"rgba(122,181,201,0.16)":"rgba(196,146,138,0.05)",border:region===r?"1px solid rgba(122,181,201,0.48)":"1px solid rgba(196,146,138,0.1)",color:region===r?T.cream:T.muted,opacity:language?1:0.7}}>{r}</button>
+                  ))}
+                </div>
+              </div>
+              <button className="btn" onClick={confirmLocation} disabled={!language||!region||locationStatus==="requesting"} style={{width:"100%",padding:"13px 10px",borderRadius:12,fontSize:12,color:locationStatus==="confirmed"?"#dff7f7":T.cream,background:locationStatus==="confirmed"?"rgba(122,181,201,0.16)":"rgba(196,146,138,0.12)",border:locationStatus==="confirmed"?"1px solid rgba(122,181,201,0.45)":"1px solid rgba(196,146,138,0.18)",letterSpacing:"0.08em",opacity:(!language||!region)?0.45:1}}>
+                {locationStatus==="confirmed"?"Location confirmed":locationStatus==="requesting"?"Confirming location…":"Confirm location"}
+              </button>
+              <p style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:locationStatus==="error"?"rgba(212,160,168,0.78)":"rgba(154,136,128,0.58)",lineHeight:1.45,marginTop:10,textAlign:"center"}}>
+                {locationStatus==="confirmed"?`${selectedLanguage?.name} · ${region} · ${locationLabel}`:locationStatus==="error"?locationError:"Language, region, and location are checked before matching."}
+              </p>
+              <button className="btn" onClick={startCamera} disabled={locationStatus!=="confirmed"||cameraStatus==="requesting"||cameraStatus==="live"} style={{width:"100%",padding:"13px 10px",borderRadius:12,fontSize:12,color:cameraStatus==="live"?"#dff7f7":T.cream,background:cameraStatus==="live"?"rgba(122,181,201,0.16)":"rgba(196,146,138,0.12)",border:cameraStatus==="live"?"1px solid rgba(122,181,201,0.45)":"1px solid rgba(196,146,138,0.18)",letterSpacing:"0.08em",opacity:locationStatus==="confirmed"?1:0.45,marginTop:10}}>
+                {cameraStatus==="live"?"Camera enabled":cameraStatus==="requesting"?"Opening camera…":"Enable camera"}
+              </button>
+              <p style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:cameraStatus==="error"?"rgba(212,160,168,0.78)":"rgba(154,136,128,0.58)",lineHeight:1.45,marginTop:10,textAlign:"center"}}>
+                {cameraStatus==="live"?"Camera is ready for the live preview.":cameraStatus==="error"?cameraError:"Camera permission is required before starting."}
+              </p>
+            </div>
             {kept.length>0&&(
               <div style={{display:"flex",alignItems:"center",gap:10,justifyContent:"center",marginBottom:22}}>
                 <span style={{fontFamily:body,fontStyle:"italic",color:T.muted,fontSize:13}}>kept:</span>
@@ -275,8 +577,8 @@ function App(){
                 ))}
               </div>
             )}
-            <button className="btn" onClick={startOver} style={{width:"100%",padding:"18px 0",borderRadius:14,fontSize:15,color:T.cream,letterSpacing:"0.08em",background:"linear-gradient(145deg,#c4928a,#a06870)",boxShadow:"0 8px 40px rgba(196,146,138,0.3)",marginBottom:12}}>Begin ❧</button>
-            <p style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:"rgba(154,136,128,0.4)"}}>your camera opens immediately</p>
+            <button className="btn" onClick={startOver} disabled={!setupComplete} style={{width:"100%",padding:"18px 0",borderRadius:14,fontSize:15,color:T.cream,letterSpacing:"0.08em",background:setupComplete?"linear-gradient(145deg,#c4928a,#a06870)":"rgba(196,146,138,0.12)",boxShadow:setupComplete?"0 8px 40px rgba(196,146,138,0.3)":"none",marginBottom:12,opacity:setupComplete?1:0.55}}>Begin ❧</button>
+            <p style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:"rgba(154,136,128,0.4)"}}>language, location, and camera are confirmed first</p>
           </div>
         )}
 
@@ -310,8 +612,21 @@ function App(){
                 <span style={{width:5,height:5,borderRadius:"50%",background:T.rose,animation:"liveGlow 1.6s ease-in-out infinite",display:"inline-block"}}/>
                 LIVE
               </div>
+              <div style={{position:"absolute",top:16,left:88,padding:"5px 10px",borderRadius:100,background:"rgba(18,13,16,0.58)",backdropFilter:"blur(8px)",border:"1px solid rgba(122,181,201,0.18)",fontFamily:sans,fontSize:9,fontWeight:500,color:"rgba(223,247,247,0.7)",maxWidth:156,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                {selectedLanguage?.name} · {region}
+              </div>
               {/* timer */}
               <div style={{position:"absolute",top:16,right:16,padding:"5px 13px",borderRadius:100,background:"rgba(18,13,16,0.6)",backdropFilter:"blur(8px)",border:"1px solid rgba(196,146,138,0.1)",fontFamily:sans,fontSize:12,fontWeight:400,color:T.muted}}>{fmt(callTime)}</div>
+              {/* guided question */}
+              <div key={activeQuestionIndex} style={{position:"absolute",top:56,left:18,right:112,padding:"12px 14px",borderRadius:15,background:"rgba(18,13,16,0.68)",backdropFilter:"blur(14px)",border:"1px solid rgba(196,146,138,0.16)",boxShadow:"0 10px 34px rgba(0,0,0,0.35)",animation:"fadeUp 0.35s ease"}}>
+                <div style={{fontFamily:sans,fontSize:8,fontWeight:600,letterSpacing:"0.2em",textTransform:"uppercase",color:"rgba(196,146,138,0.55)",marginBottom:5}}>she asks</div>
+                <div style={{fontFamily:serif,fontSize:18,lineHeight:1.12,color:T.cream}}>{activeQuestion}</div>
+                <div style={{display:"flex",gap:4,marginTop:10}}>
+                  {CALL_QUESTIONS.map((_,i)=>(
+                    <span key={i} style={{width:i===activeQuestionIndex?16:5,height:5,borderRadius:20,background:i===activeQuestionIndex?"rgba(196,146,138,0.85)":"rgba(196,146,138,0.22)",transition:"all 0.25s"}}/>
+                  ))}
+                </div>
+              </div>
               {/* name */}
               <div style={{position:"absolute",bottom:22,left:18,padding:"12px 18px",borderRadius:14,background:"rgba(18,13,16,0.75)",backdropFilter:"blur(14px)",border:"1px solid rgba(196,146,138,0.1)"}}>
                 <div style={{fontFamily:serif,fontWeight:400,fontSize:19,color:T.cream}}>{profile.name}, {profile.age}</div>
@@ -324,7 +639,20 @@ function App(){
               )}
             </div>
             {/* self PIP */}
-            <div style={{position:"absolute",top:60,right:28,width:80,height:108,borderRadius:13,background:`linear-gradient(160deg,${T.card},${T.surface})`,border:"1px solid rgba(196,146,138,0.14)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,color:"rgba(154,136,128,0.28)",backdropFilter:"blur(10px)",zIndex:10,boxShadow:"0 4px 28px rgba(0,0,0,0.55)"}}>👤</div>
+            <div style={{position:"absolute",top:60,right:28,width:84,height:114,borderRadius:13,background:`linear-gradient(160deg,${T.card},${T.surface})`,border:cameraStatus==="live"?"1px solid rgba(122,181,201,0.55)":"1px solid rgba(196,146,138,0.18)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,color:"rgba(154,136,128,0.28)",backdropFilter:"blur(10px)",zIndex:10,boxShadow:cameraStatus==="live"?"0 0 24px rgba(122,181,201,0.18),0 4px 28px rgba(0,0,0,0.55)":"0 4px 28px rgba(0,0,0,0.55)",overflow:"hidden"}}>
+              <video ref={videoRef} autoPlay playsInline muted style={{width:"100%",height:"100%",objectFit:"cover",transform:"scaleX(-1)",display:cameraStatus==="live"?"block":"none"}}/>
+              {cameraStatus!=="live"&&(
+                <div style={{padding:"0 8px",textAlign:"center"}}>
+                  <div style={{fontSize:22,marginBottom:6}}>👤</div>
+                  <div style={{fontFamily:sans,fontSize:8,letterSpacing:"0.14em",textTransform:"uppercase",color:"rgba(196,146,138,0.55)",lineHeight:1.4}}>
+                    {cameraStatus==="requesting"?"opening":"camera off"}
+                  </div>
+                </div>
+              )}
+              <div style={{position:"absolute",left:7,bottom:7,padding:"3px 7px",borderRadius:100,background:"rgba(18,13,16,0.72)",fontFamily:sans,fontSize:8,fontWeight:600,letterSpacing:"0.12em",color:cameraStatus==="live"?"#9bd0dc":"rgba(196,146,138,0.55)",textTransform:"uppercase"}}>
+                {cameraStatus==="live"?"camera live":cameraStatus==="error"?"blocked":"preview"}
+              </div>
+            </div>
             {/* controls */}
             <div style={{display:"flex",gap:8,marginBottom:8}}>
               <button className="btn" onClick={goNext} style={{flex:1,padding:"15px 0",borderRadius:13,fontSize:13,color:T.muted,background:T.card,border:`1px solid ${T.border}`,letterSpacing:"0.05em"}}>pass ⟶</button>
@@ -403,7 +731,7 @@ function App(){
             )}
             <div style={{display:"flex",gap:8,marginTop:11}}>
               <button className="btn" onClick={startOver} style={{flex:1,padding:"13px 0",borderRadius:13,fontSize:13,color:T.cream,background:T.card,border:`1px solid ${T.border}`,letterSpacing:"0.04em"}}>Continue</button>
-              <button className="btn" onClick={()=>setScreen("home")} style={{flex:1,padding:"13px 0",borderRadius:13,fontSize:13,color:T.muted,background:"transparent",border:"1px solid rgba(196,146,138,0.08)",fontFamily:body,fontStyle:"italic"}}>Back home</button>
+              <button className="btn" onClick={goHome} style={{flex:1,padding:"13px 0",borderRadius:13,fontSize:13,color:T.muted,background:"transparent",border:"1px solid rgba(196,146,138,0.08)",fontFamily:body,fontStyle:"italic"}}>Back home</button>
             </div>
           </div>
         )}
@@ -432,7 +760,7 @@ function App(){
               ))}
             </div>
             <button className="btn" onClick={startOver} style={{width:"100%",padding:"16px 0",borderRadius:13,fontSize:14,color:T.cream,background:"linear-gradient(145deg,#c4928a,#a06870)",boxShadow:"0 6px 32px rgba(196,146,138,0.25)",letterSpacing:"0.07em",marginBottom:10}}>Continue ❧</button>
-            <button className="btn" onClick={()=>setScreen("home")} style={{width:"100%",padding:"12px 0",borderRadius:13,fontSize:13,color:T.muted,background:"transparent",border:"none",fontFamily:body,fontStyle:"italic"}}>Back home</button>
+            <button className="btn" onClick={goHome} style={{width:"100%",padding:"12px 0",borderRadius:13,fontSize:13,color:T.muted,background:"transparent",border:"none",fontFamily:body,fontStyle:"italic"}}>Back home</button>
           </div>
         )}
 
