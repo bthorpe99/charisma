@@ -241,6 +241,7 @@ const REGIONS_BY_LANGUAGE={
   fr:["France","Canada - Quebec","Haiti","Senegal"],
   pt:["Brazil","Portugal","Angola","Cape Verde"]
 };
+const LIVE_SITE_URL="https://bthorpe99.github.io/charisma/";
 
 let profileIndex=0;
 
@@ -347,6 +348,8 @@ function App(){
   const [locationStatus,setLocationStatus]=useState("idle");
   const [locationError,setLocationError]=useState("");
   const [location,setLocation]=useState(null);
+  const [betaRoom,setBetaRoom]=useState(()=>new URLSearchParams(window.location.search).get("room")||"");
+  const [inviteCopied,setInviteCopied]=useState(false);
   const timerRef=useRef(null);
   const blurRef=useRef(null);
   const videoRef=useRef(null);
@@ -442,6 +445,25 @@ function App(){
     });
   };
 
+  const makeRoomId=()=>`charisma-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
+
+  const createBetaInvite=async()=>{
+    const nextRoom=betaRoom||makeRoomId();
+    setBetaRoom(nextRoom);
+    const localUrl=new URL(window.location.href);
+    localUrl.searchParams.set("room",nextRoom);
+    window.history.replaceState(null,"",localUrl.toString());
+    const base=window.location.hostname==="localhost"||window.location.hostname==="127.0.0.1"?LIVE_SITE_URL:`${window.location.origin}${window.location.pathname}`;
+    const inviteUrl=`${base}${base.includes("?")?"&":"?"}room=${encodeURIComponent(nextRoom)}`;
+    try{
+      await navigator.clipboard?.writeText(inviteUrl);
+      setInviteCopied(true);
+      setTimeout(()=>setInviteCopied(false),2400);
+    }catch(err){
+      setInviteCopied(false);
+    }
+  };
+
   const sendGift=g=>{
     if(coins<g.price)return;
     setCoins(c=>c-g.price);
@@ -489,6 +511,9 @@ function App(){
   const availableRegions=language?REGIONS_BY_LANGUAGE[language]:[];
   const setupComplete=Boolean(language&&region&&locationStatus==="confirmed"&&cameraStatus==="live");
   const locationLabel=location?`${location.lat.toFixed(2)}, ${location.lng.toFixed(2)}`:"";
+  const publicBase=window.location.hostname==="localhost"||window.location.hostname==="127.0.0.1"?LIVE_SITE_URL:`${window.location.origin}${window.location.pathname}`;
+  const betaInviteLink=betaRoom?`${publicBase}${publicBase.includes("?")?"&":"?"}room=${encodeURIComponent(betaRoom)}`:"";
+  const betaCallUrl=betaRoom?`https://meet.jit.si/${encodeURIComponent(betaRoom)}#config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false&interfaceConfig.SHOW_JITSI_WATERMARK=false`:"";
 
   return(
     <div style={{minHeight:"100vh",background:T.bg,fontFamily:body,color:T.text,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",overflow:"hidden",position:"relative"}}>
@@ -569,6 +594,16 @@ function App(){
                 {cameraStatus==="live"?"Camera is ready for the live preview.":cameraStatus==="error"?cameraError:"Camera permission is required before starting."}
               </p>
             </div>
+            <div className="glass" style={{padding:"16px 18px",marginBottom:22,textAlign:"left"}}>
+              <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.24em",color:"rgba(196,146,138,0.45)",textTransform:"uppercase",marginBottom:10}}>Private beta invite</p>
+              <p style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted,lineHeight:1.5,marginBottom:12}}>Create a room link and send it to one person. If both of you open the same link, you join the same live video room.</p>
+              {betaInviteLink&&(
+                <div style={{padding:"10px 12px",borderRadius:10,background:"rgba(18,13,16,0.45)",border:"1px solid rgba(196,146,138,0.1)",fontFamily:sans,fontSize:10,color:"rgba(245,236,230,0.72)",lineHeight:1.45,wordBreak:"break-all",marginBottom:10}}>{betaInviteLink}</div>
+              )}
+              <button className="btn" onClick={createBetaInvite} style={{width:"100%",padding:"12px 10px",borderRadius:12,fontSize:12,color:T.cream,background:"rgba(122,181,201,0.14)",border:"1px solid rgba(122,181,201,0.35)",letterSpacing:"0.08em"}}>
+                {betaRoom?(inviteCopied?"Copied invite link":"Copy beta invite link"):"Create beta invite link"}
+              </button>
+            </div>
             {kept.length>0&&(
               <div style={{display:"flex",alignItems:"center",gap:10,justifyContent:"center",marginBottom:22}}>
                 <span style={{fontFamily:body,fontStyle:"italic",color:T.muted,fontSize:13}}>kept:</span>
@@ -592,10 +627,18 @@ function App(){
               <div style={{position:"absolute",top:-46,left:"50%",padding:"9px 24px",borderRadius:100,zIndex:130,background:"rgba(196,146,138,0.88)",backdropFilter:"blur(10px)",fontFamily:body,fontStyle:"italic",fontSize:14,color:"#fff",animation:"revealFloat 3.2s ease forwards",whiteSpace:"nowrap",letterSpacing:"0.04em"}}>{revealMsg}</div>
             )}
             <div style={{width:"100%",aspectRatio:"9/16",borderRadius:24,overflow:"hidden",background:`linear-gradient(175deg,${profile.hue}14 0%,${T.surface} 50%,${T.bg} 100%)`,border:pulseRing?"1px solid rgba(196,146,138,0.5)":"1px solid rgba(196,146,138,0.1)",position:"relative",marginBottom:12,boxShadow:pulseRing?"0 0 50px rgba(196,146,138,0.2),0 16px 60px rgba(0,0,0,0.6)":"0 16px 60px rgba(0,0,0,0.55)",transition:"border 0.5s,box-shadow 0.5s"}}>
+              {betaRoom&&(
+                <iframe
+                  title="Charisma beta live room"
+                  src={betaCallUrl}
+                  allow="camera; microphone; fullscreen; display-capture; autoplay"
+                  style={{position:"absolute",inset:0,width:"100%",height:"100%",border:0,background:"#111",zIndex:1}}
+                />
+              )}
               {/* blurred avatar */}
-              <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-60%)",width:118,height:118,borderRadius:"50%",background:`radial-gradient(circle at 35% 35%,${profile.hue}ee,${profile.hue}55)`,border:`2px solid ${profile.hue}44`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:serif,fontSize:50,fontWeight:300,color:T.cream,filter:`blur(${blurAmount*0.32}px)`,transition:"filter 1.4s ease,box-shadow 1.2s ease",boxShadow:blurAmount===0?`0 0 80px ${profile.hue}55,0 0 0 10px ${profile.hue}18`:`0 0 50px ${profile.hue}28`}}>{profile.avatar}</div>
+              {!betaRoom&&<div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-60%)",width:118,height:118,borderRadius:"50%",background:`radial-gradient(circle at 35% 35%,${profile.hue}ee,${profile.hue}55)`,border:`2px solid ${profile.hue}44`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:serif,fontSize:50,fontWeight:300,color:T.cream,filter:`blur(${blurAmount*0.32}px)`,transition:"filter 1.4s ease,box-shadow 1.2s ease",boxShadow:blurAmount===0?`0 0 80px ${profile.hue}55,0 0 0 10px ${profile.hue}18`:`0 0 50px ${profile.hue}28`}}>{profile.avatar}</div>}
               {/* reveal bar */}
-              <div style={{position:"absolute",top:"67%",left:"50%",transform:"translateX(-50%)",width:130,textAlign:"center"}}>
+              {!betaRoom&&<div style={{position:"absolute",top:"67%",left:"50%",transform:"translateX(-50%)",width:130,textAlign:"center"}}>
                 {blurAmount>0?(
                   <>
                     <div style={{width:"100%",height:2,borderRadius:100,background:"rgba(196,146,138,0.12)",marginBottom:8,overflow:"hidden"}}>
@@ -606,19 +649,19 @@ function App(){
                 ):(
                   <span style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:"rgba(196,146,138,0.7)",letterSpacing:"0.06em"}}>❧ revealed</span>
                 )}
-              </div>
+              </div>}
               {/* LIVE pill */}
-              <div style={{position:"absolute",top:16,left:16,display:"flex",alignItems:"center",gap:6,padding:"5px 13px",borderRadius:100,background:"rgba(18,13,16,0.7)",backdropFilter:"blur(8px)",border:"1px solid rgba(196,146,138,0.2)",fontFamily:sans,fontSize:10,fontWeight:600,letterSpacing:"0.18em",color:"rgba(196,146,138,0.7)"}}>
+              <div style={{position:"absolute",top:16,left:16,zIndex:2,display:"flex",alignItems:"center",gap:6,padding:"5px 13px",borderRadius:100,background:"rgba(18,13,16,0.7)",backdropFilter:"blur(8px)",border:"1px solid rgba(196,146,138,0.2)",fontFamily:sans,fontSize:10,fontWeight:600,letterSpacing:"0.18em",color:"rgba(196,146,138,0.7)"}}>
                 <span style={{width:5,height:5,borderRadius:"50%",background:T.rose,animation:"liveGlow 1.6s ease-in-out infinite",display:"inline-block"}}/>
                 LIVE
               </div>
-              <div style={{position:"absolute",top:16,left:88,padding:"5px 10px",borderRadius:100,background:"rgba(18,13,16,0.58)",backdropFilter:"blur(8px)",border:"1px solid rgba(122,181,201,0.18)",fontFamily:sans,fontSize:9,fontWeight:500,color:"rgba(223,247,247,0.7)",maxWidth:156,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+              <div style={{position:"absolute",top:16,left:88,zIndex:2,padding:"5px 10px",borderRadius:100,background:"rgba(18,13,16,0.58)",backdropFilter:"blur(8px)",border:"1px solid rgba(122,181,201,0.18)",fontFamily:sans,fontSize:9,fontWeight:500,color:"rgba(223,247,247,0.7)",maxWidth:156,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
                 {selectedLanguage?.name} · {region}
               </div>
               {/* timer */}
-              <div style={{position:"absolute",top:16,right:16,padding:"5px 13px",borderRadius:100,background:"rgba(18,13,16,0.6)",backdropFilter:"blur(8px)",border:"1px solid rgba(196,146,138,0.1)",fontFamily:sans,fontSize:12,fontWeight:400,color:T.muted}}>{fmt(callTime)}</div>
+              <div style={{position:"absolute",top:16,right:16,zIndex:2,padding:"5px 13px",borderRadius:100,background:"rgba(18,13,16,0.6)",backdropFilter:"blur(8px)",border:"1px solid rgba(196,146,138,0.1)",fontFamily:sans,fontSize:12,fontWeight:400,color:T.muted}}>{fmt(callTime)}</div>
               {/* guided question */}
-              <div key={activeQuestionIndex} style={{position:"absolute",top:56,left:18,right:112,padding:"12px 14px",borderRadius:15,background:"rgba(18,13,16,0.68)",backdropFilter:"blur(14px)",border:"1px solid rgba(196,146,138,0.16)",boxShadow:"0 10px 34px rgba(0,0,0,0.35)",animation:"fadeUp 0.35s ease"}}>
+              <div key={activeQuestionIndex} style={{position:"absolute",top:56,left:18,right:112,padding:"12px 14px",borderRadius:15,background:"rgba(18,13,16,0.68)",backdropFilter:"blur(14px)",border:"1px solid rgba(196,146,138,0.16)",boxShadow:"0 10px 34px rgba(0,0,0,0.35)",animation:"fadeUp 0.35s ease",zIndex:2,pointerEvents:"none"}}>
                 <div style={{fontFamily:sans,fontSize:8,fontWeight:600,letterSpacing:"0.2em",textTransform:"uppercase",color:"rgba(196,146,138,0.55)",marginBottom:5}}>she asks</div>
                 <div style={{fontFamily:serif,fontSize:18,lineHeight:1.12,color:T.cream}}>{activeQuestion}</div>
                 <div style={{display:"flex",gap:4,marginTop:10}}>
@@ -628,10 +671,10 @@ function App(){
                 </div>
               </div>
               {/* name */}
-              <div style={{position:"absolute",bottom:22,left:18,padding:"12px 18px",borderRadius:14,background:"rgba(18,13,16,0.75)",backdropFilter:"blur(14px)",border:"1px solid rgba(196,146,138,0.1)"}}>
+              {!betaRoom&&<div style={{position:"absolute",bottom:22,left:18,padding:"12px 18px",borderRadius:14,background:"rgba(18,13,16,0.75)",backdropFilter:"blur(14px)",border:"1px solid rgba(196,146,138,0.1)"}}>
                 <div style={{fontFamily:serif,fontWeight:400,fontSize:19,color:T.cream}}>{profile.name}, {profile.age}</div>
                 <div style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:T.muted,marginTop:3}}>{profile.city} · {profile.vibe}</div>
-              </div>
+              </div>}
               {sentGifts.length>0&&(
                 <div style={{position:"absolute",bottom:26,right:14,display:"flex",flexDirection:"column",gap:4,alignItems:"flex-end"}}>
                   {sentGifts.slice(-4).map((g,i)=><span key={i} style={{fontSize:19,filter:"drop-shadow(0 2px 6px rgba(0,0,0,0.7))"}}>{g.emoji}</span>)}
