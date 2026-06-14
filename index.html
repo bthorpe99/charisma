@@ -445,6 +445,12 @@ function App(){
     });
   };
 
+  const confirmRegionOnly=()=>{
+    setLocation(null);
+    setLocationError("");
+    setLocationStatus("confirmed");
+  };
+
   const makeRoomId=()=>`charisma-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
 
   const createBetaInvite=async()=>{
@@ -510,7 +516,7 @@ function App(){
   const selectedLanguage=LANGUAGES.find(l=>l.id===language);
   const availableRegions=language?REGIONS_BY_LANGUAGE[language]:[];
   const setupComplete=Boolean(language&&region&&locationStatus==="confirmed"&&cameraStatus==="live");
-  const locationLabel=location?`${location.lat.toFixed(2)}, ${location.lng.toFixed(2)}`:"";
+  const locationLabel=location?`${location.lat.toFixed(2)}, ${location.lng.toFixed(2)}`:"region only";
   const publicBase=window.location.hostname==="localhost"||window.location.hostname==="127.0.0.1"?LIVE_SITE_URL:`${window.location.origin}${window.location.pathname}`;
   const betaInviteLink=betaRoom?`${publicBase}${publicBase.includes("?")?"&":"?"}room=${encodeURIComponent(betaRoom)}`:"";
   const betaCallUrl=betaRoom?`https://meet.jit.si/${encodeURIComponent(betaRoom)}#config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false&interfaceConfig.SHOW_JITSI_WATERMARK=false`:"";
@@ -582,11 +588,16 @@ function App(){
                 </div>
               </div>
               <button className="btn" onClick={confirmLocation} disabled={!language||!region||locationStatus==="requesting"} style={{width:"100%",padding:"13px 10px",borderRadius:12,fontSize:12,color:locationStatus==="confirmed"?"#dff7f7":T.cream,background:locationStatus==="confirmed"?"rgba(122,181,201,0.16)":"rgba(196,146,138,0.12)",border:locationStatus==="confirmed"?"1px solid rgba(122,181,201,0.45)":"1px solid rgba(196,146,138,0.18)",letterSpacing:"0.08em",opacity:(!language||!region)?0.45:1}}>
-                {locationStatus==="confirmed"?"Location confirmed":locationStatus==="requesting"?"Confirming location…":"Confirm location"}
+                {locationStatus==="confirmed"?"Region confirmed":locationStatus==="requesting"?"Confirming location…":"Confirm location"}
               </button>
               <p style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:locationStatus==="error"?"rgba(212,160,168,0.78)":"rgba(154,136,128,0.58)",lineHeight:1.45,marginTop:10,textAlign:"center"}}>
                 {locationStatus==="confirmed"?`${selectedLanguage?.name} · ${region} · ${locationLabel}`:locationStatus==="error"?locationError:"Language, region, and location are checked before matching."}
               </p>
+              {locationStatus==="error"&&(
+                <button className="btn" onClick={confirmRegionOnly} disabled={!language||!region} style={{width:"100%",padding:"11px 10px",borderRadius:12,fontSize:11,color:T.cream,background:"rgba(196,146,138,0.08)",border:"1px solid rgba(196,146,138,0.18)",letterSpacing:"0.06em",marginTop:8}}>
+                  Use selected region for beta
+                </button>
+              )}
               <button className="btn" onClick={startCamera} disabled={locationStatus!=="confirmed"||cameraStatus==="requesting"||cameraStatus==="live"} style={{width:"100%",padding:"13px 10px",borderRadius:12,fontSize:12,color:cameraStatus==="live"?"#dff7f7":T.cream,background:cameraStatus==="live"?"rgba(122,181,201,0.16)":"rgba(196,146,138,0.12)",border:cameraStatus==="live"?"1px solid rgba(122,181,201,0.45)":"1px solid rgba(196,146,138,0.18)",letterSpacing:"0.08em",opacity:locationStatus==="confirmed"?1:0.45,marginTop:10}}>
                 {cameraStatus==="live"?"Camera enabled":cameraStatus==="requesting"?"Opening camera…":"Enable camera"}
               </button>
