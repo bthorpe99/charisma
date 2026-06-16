@@ -251,6 +251,17 @@ const ACCESS_RESET_MS=24*60*60*1000;
 const DEFAULT_ACCESS={windowStart:Date.now(),callsUsed:0};
 const DEFAULT_PROFILE={name:"",age:"",city:"",role:"",intent:"Real dates",wallet:1200,isMember:false,giftsSent:[],giftsReceived:[]};
 const LIVE_SITE_URL="https://trycharisma.live/";
+const STRIPE_LINKS={
+  membership:"",
+  grace500:"",
+  grace1200:"",
+  grace3000:""
+};
+const GRACE_PACKS=[
+  {id:"grace500",label:"500 Grace Points",points:500,price:"$4.99"},
+  {id:"grace1200",label:"1,200 Grace Points",points:1200,price:"$9.99"},
+  {id:"grace3000",label:"3,000 Grace Points",points:3000,price:"$19.99"}
+];
 const BACKGROUND_VIDEOS=[
   "assets/videos/date-night-smile.mp4",
   "assets/videos/moody-romance.mp4",
@@ -505,6 +516,28 @@ function App(){
     localStorage.setItem("charismaProfile",JSON.stringify(saved));
   },[userProfile,coins]);
 
+  useEffect(()=>{
+    const params=new URLSearchParams(window.location.search);
+    const paid=params.get("paid");
+    if(!paid)return;
+    if(paid==="membership"){
+      const next={...userProfile,isMember:true};
+      setUserProfile(next);
+      setProfileDraft(p=>({...p,isMember:true}));
+      localStorage.setItem("charismaProfile",JSON.stringify(next));
+      setAccessNotice("Membership activated. Unlimited reveal calls are unlocked.");
+    }else{
+      const pack=GRACE_PACKS.find(p=>p.id===paid);
+      if(pack){
+        setCoins(c=>c+pack.points);
+        setAccessNotice(`${pack.label} added to your wallet.`);
+      }
+    }
+    params.delete("paid");
+    const clean=`${window.location.pathname}${params.toString()?`?${params.toString()}`:""}${window.location.hash}`;
+    window.history.replaceState(null,"",clean||"/");
+  },[]);
+
   const fmt=s=>`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
 
   const isWoman=userProfile.role==="Woman";
@@ -532,12 +565,17 @@ function App(){
     localStorage.setItem("charismaProfile",JSON.stringify(next));
   };
 
+  const openStripeCheckout=(kind)=>{
+    const url=STRIPE_LINKS[kind];
+    if(!url){
+      setAccessNotice("Stripe checkout is ready in the app. Add your Stripe Payment Link to turn this on.");
+      return;
+    }
+    window.location.href=url;
+  };
+
   const upgradeMembership=()=>{
-    const next={...userProfile,isMember:true};
-    setUserProfile(next);
-    setProfileDraft(p=>({...p,isMember:true}));
-    localStorage.setItem("charismaProfile",JSON.stringify(next));
-    setAccessNotice("Beta membership unlocked. Replace this with Stripe Checkout when your payment link is ready.");
+    openStripeCheckout("membership");
   };
 
   const recordRevealStart=()=>{
@@ -913,6 +951,14 @@ function App(){
                   Get membership for unlimited
                 </button>
               )}
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:7,marginTop:10}}>
+                {GRACE_PACKS.map(pack=>(
+                  <button key={pack.id} className="btn" onClick={()=>openStripeCheckout(pack.id)} style={{padding:"10px 5px",borderRadius:11,fontSize:10,color:T.gold,background:"rgba(201,168,122,0.08)",border:"1px solid rgba(201,168,122,0.16)",lineHeight:1.3}}>
+                    <div style={{fontWeight:600}}>{pack.price}</div>
+                    <div style={{fontFamily:body,fontStyle:"italic",color:T.muted}}>{pack.points.toLocaleString()} pts</div>
+                  </button>
+                ))}
+              </div>
               {accessNotice&&<p style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:"rgba(212,160,168,0.82)",lineHeight:1.45,marginTop:10,textAlign:"center"}}>{accessNotice}</p>}
             </div>
             <div className="glass" style={{padding:"18px 18px",marginBottom:22,textAlign:"left"}}>
@@ -1069,6 +1115,14 @@ function App(){
                       </button>
                     );
                   })}
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:7,marginTop:10}}>
+                  {GRACE_PACKS.map(pack=>(
+                    <button key={pack.id} className="btn" onClick={()=>openStripeCheckout(pack.id)} style={{padding:"9px 4px",borderRadius:10,fontSize:10,color:T.gold,background:"rgba(201,168,122,0.08)",border:"1px solid rgba(201,168,122,0.16)",lineHeight:1.25}}>
+                      <div style={{fontWeight:600}}>{pack.price}</div>
+                      <div style={{fontFamily:body,fontStyle:"italic",color:T.muted}}>{pack.points.toLocaleString()} pts</div>
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
