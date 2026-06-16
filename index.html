@@ -242,6 +242,7 @@ const REGIONS_BY_LANGUAGE={
   fr:["France","Canada - Quebec","Haiti","Senegal"],
   pt:["Brazil","Portugal","Angola","Cape Verde"]
 };
+const DEFAULT_PROFILE={name:"",age:"",city:"",intent:"Real dates",wallet:1200,giftsSent:[],giftsReceived:[]};
 const LIVE_SITE_URL="https://bthorpe99.github.io/charisma/";
 const BACKGROUND_VIDEOS=[
   "assets/videos/date-night-smile.mp4",
@@ -410,7 +411,15 @@ function App(){
   const [callTime,setCallTime]=useState(0);
   const [blurAmount,setBlurAmount]=useState(22);
   const [revealMsg,setRevealMsg]=useState(null);
-  const [coins,setCoins]=useState(1200);
+  const [userProfile,setUserProfile]=useState(()=>{
+    try{return {...DEFAULT_PROFILE,...JSON.parse(localStorage.getItem("charismaProfile")||"{}")};}
+    catch(err){return DEFAULT_PROFILE;}
+  });
+  const [profileDraft,setProfileDraft]=useState(()=>{
+    try{return {...DEFAULT_PROFILE,...JSON.parse(localStorage.getItem("charismaProfile")||"{}")};}
+    catch(err){return DEFAULT_PROFILE;}
+  });
+  const [coins,setCoins]=useState(()=>Number(userProfile.wallet)||1200);
   const [profile,setProfile]=useState(PROFILES[0]);
   const [kept,setKept]=useState([]);
   const [showGifts,setShowGifts]=useState(false);
@@ -418,6 +427,9 @@ function App(){
   const [sentGifts,setSentGifts]=useState([]);
   const [pulseRing,setPulseRing]=useState(false);
   const [selectedRest,setSelectedRest]=useState(null);
+  const [restaurants,setRestaurants]=useState(RESTAURANTS);
+  const [restaurantStatus,setRestaurantStatus]=useState("idle");
+  const [restaurantError,setRestaurantError]=useState("");
   const [selectedTime,setSelectedTime]=useState(null);
   const [bookingDate,setBookingDate]=useState("Tonight");
   const [bookingParty,setBookingParty]=useState(2);
@@ -463,7 +475,78 @@ function App(){
     }
   },[screen,cameraStatus]);
 
+  useEffect(()=>{
+    const saved={...userProfile,wallet:coins};
+    localStorage.setItem("charismaProfile",JSON.stringify(saved));
+  },[userProfile,coins]);
+
   const fmt=s=>`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
+
+  const profileComplete=Boolean(userProfile.name&&userProfile.age&&userProfile.city);
+
+  const saveProfile=()=>{
+    const next={
+      ...userProfile,
+      name:String(profileDraft.name||"").trim(),
+      age:String(profileDraft.age||"").trim(),
+      city:String(profileDraft.city||"").trim(),
+      intent:profileDraft.intent||"Real dates",
+      wallet:Number(profileDraft.wallet)||coins||1200
+    };
+    setUserProfile(next);
+    setCoins(next.wallet);
+    localStorage.setItem("charismaProfile",JSON.stringify(next));
+  };
+
+  const milesBetween=(lat1,lng1,lat2,lng2)=>{
+    const r=3958.8;
+    const dLat=(lat2-lat1)*Math.PI/180;
+    const dLng=(lng2-lng1)*Math.PI/180;
+    const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+    return r*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+  };
+
+  const loadNearbyRestaurants=async(lat,lng)=>{
+    setRestaurantStatus("loading");
+    setRestaurantError("");
+    try{
+      const query=`[out:json][timeout:14];(node["amenity"~"restaurant|cafe|bar"](around:5000,${lat},${lng});way["amenity"~"restaurant|cafe|bar"](around:5000,${lat},${lng}););out center 28;`;
+      const res=await fetch("https://overpass-api.de/api/interpreter",{method:"POST",body:query});
+      if(!res.ok)throw new Error("Restaurant lookup failed");
+      const data=await res.json();
+      const mapped=(data.elements||[])
+        .map((el,i)=>{
+          const tags=el.tags||{};
+          const rLat=el.lat||el.center?.lat;
+          const rLng=el.lon||el.center?.lon;
+          if(!tags.name||!rLat||!rLng)return null;
+          const miles=milesBetween(lat,lng,rLat,rLng);
+          return {
+            id:`osm-${el.type}-${el.id}`,
+            name:tags.name,
+            cuisine:tags.cuisine?tags.cuisine.split(";").slice(0,2).map(s=>s.trim()).join(" · "):(tags.amenity==="cafe"?"Cafe":tags.amenity==="bar"?"Bar":"Restaurant"),
+            rating:"local",
+            price:tags["payment:credit_cards"]==="yes"?"$$":"$–$$",
+            distance:`${miles.toFixed(1)} mi`,
+            vibe:tags.amenity==="cafe"?"Coffee · Casual":tags.amenity==="bar"?"Drinks · Social":"Local · Date spot",
+            times:["6:00 PM","6:30 PM","7:30 PM","8:30 PM"],
+            neighborhood:tags["addr:street"]||tags["addr:city"]||"Nearby",
+            lat:rLat,
+            lng:rLng
+          };
+        })
+        .filter(Boolean)
+        .sort((a,b)=>parseFloat(a.distance)-parseFloat(b.distance))
+        .slice(0,12);
+      if(mapped.length)setRestaurants(mapped);
+      else throw new Error("No nearby restaurants found");
+      setRestaurantStatus("loaded");
+    }catch(err){
+      setRestaurants(RESTAURANTS);
+      setRestaurantStatus("error");
+      setRestaurantError("Using sample restaurants for now. Real places could not load.");
+    }
+  };
 
   const stopCamera=()=>{
     if(streamRef.current){
@@ -514,6 +597,7 @@ function App(){
             lng:pos.coords.longitude,
             accuracy:pos.coords.accuracy
           });
+          loadNearbyRestaurants(pos.coords.latitude,pos.coords.longitude);
           setLocationStatus("confirmed");
           resolve(true);
         },
@@ -556,13 +640,17 @@ function App(){
     if(coins<g.price)return;
     setCoins(c=>c-g.price);
     setSentGifts(p=>[...p,g]);
+    setUserProfile(p=>({
+      ...p,
+      giftsSent:[...(p.giftsSent||[]),{gift:g.name,price:g.price,to:profile.name,at:new Date().toISOString()}]
+    }));
     setFloating(p=>[...p,{...g,key:Date.now()}]);
     setPulseRing(true);
     setTimeout(()=>setPulseRing(false),900);
   };
 
   const startOver=async()=>{
-    if(!language||!region||locationStatus!=="confirmed"||cameraStatus!=="live")return;
+    if(!profileComplete||!language||!region||locationStatus!=="confirmed"||cameraStatus!=="live")return;
     profileIndex=0;
     setProfile(PROFILES[profileIndex]);
     setSentGifts([]);setShowGifts(false);
@@ -597,7 +685,7 @@ function App(){
   const activeQuestion=CALL_QUESTIONS[activeQuestionIndex];
   const selectedLanguage=LANGUAGES.find(l=>l.id===language);
   const availableRegions=language?REGIONS_BY_LANGUAGE[language]:[];
-  const setupComplete=Boolean(language&&region&&locationStatus==="confirmed"&&cameraStatus==="live");
+  const setupComplete=Boolean(profileComplete&&language&&region&&locationStatus==="confirmed"&&cameraStatus==="live");
   const locationLabel=location?`${location.lat.toFixed(2)}, ${location.lng.toFixed(2)}`:"region only";
   const publicBase=window.location.hostname==="localhost"||window.location.hostname==="127.0.0.1"?LIVE_SITE_URL:`${window.location.origin}${window.location.pathname}`;
   const betaInviteLink=betaRoom?`${publicBase}${publicBase.includes("?")?"&":"?"}room=${encodeURIComponent(betaRoom)}`:"";
@@ -659,6 +747,26 @@ function App(){
                   </div>
                 </div>
               ))}
+            </div>
+            <div className="glass" style={{padding:"18px 18px",marginBottom:22,textAlign:"left"}}>
+              <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.24em",color:"rgba(196,146,138,0.45)",textTransform:"uppercase",marginBottom:12}}>Your profile</p>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 78px",gap:8,marginBottom:8}}>
+                <input value={profileDraft.name} onChange={e=>setProfileDraft(p=>({...p,name:e.target.value}))} placeholder="Display name" style={{padding:"12px 12px",borderRadius:11,border:"1px solid rgba(196,146,138,0.14)",background:"rgba(18,13,16,0.42)",color:T.cream,fontFamily:sans,fontSize:13,outline:"none"}}/>
+                <input value={profileDraft.age} onChange={e=>setProfileDraft(p=>({...p,age:e.target.value.replace(/\D/g,'').slice(0,2)}))} placeholder="Age" inputMode="numeric" style={{padding:"12px 12px",borderRadius:11,border:"1px solid rgba(196,146,138,0.14)",background:"rgba(18,13,16,0.42)",color:T.cream,fontFamily:sans,fontSize:13,outline:"none"}}/>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr",gap:8,marginBottom:10}}>
+                <input value={profileDraft.city} onChange={e=>setProfileDraft(p=>({...p,city:e.target.value}))} placeholder="City / home base" style={{padding:"12px 12px",borderRadius:11,border:"1px solid rgba(196,146,138,0.14)",background:"rgba(18,13,16,0.42)",color:T.cream,fontFamily:sans,fontSize:13,outline:"none"}}/>
+                <select value={profileDraft.intent} onChange={e=>setProfileDraft(p=>({...p,intent:e.target.value}))} style={{padding:"12px 12px",borderRadius:11,border:"1px solid rgba(196,146,138,0.14)",background:"rgba(18,13,16,0.84)",color:T.cream,fontFamily:sans,fontSize:13,outline:"none"}}>
+                  {["Real dates","Dinner tonight","Long-term chemistry","Casual but intentional"].map(v=><option key={v} value={v}>{v}</option>)}
+                </select>
+              </div>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <button className="btn" onClick={saveProfile} style={{flex:1,padding:"12px 10px",borderRadius:12,fontSize:12,color:T.cream,background:"rgba(196,146,138,0.14)",border:"1px solid rgba(196,146,138,0.25)",letterSpacing:"0.08em"}}>{profileComplete?"Update profile":"Save profile"}</button>
+                <div style={{padding:"10px 12px",borderRadius:12,background:"rgba(201,168,122,0.1)",border:"1px solid rgba(201,168,122,0.18)",fontFamily:sans,fontSize:12,color:T.gold,whiteSpace:"nowrap"}}>❧ {coins.toLocaleString()}</div>
+              </div>
+              <p style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:profileComplete?"rgba(154,220,190,0.75)":"rgba(154,136,128,0.58)",lineHeight:1.45,marginTop:10,textAlign:"center"}}>
+                {profileComplete?`${userProfile.name}, ${userProfile.age} · ${userProfile.city} · ${userProfile.intent}`:"Save a profile so gifts and Grace Points belong to someone."}
+              </p>
             </div>
             <div className="glass" style={{padding:"18px 18px",marginBottom:22,textAlign:"left"}}>
               <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.24em",color:"rgba(196,146,138,0.45)",textTransform:"uppercase",marginBottom:12}}>Match setup</p>
@@ -759,7 +867,7 @@ function App(){
                 LIVE
               </div>
               <div style={{position:"absolute",top:16,left:88,zIndex:2,padding:"5px 10px",borderRadius:100,background:"rgba(18,13,16,0.58)",backdropFilter:"blur(8px)",border:"1px solid rgba(122,181,201,0.18)",fontFamily:sans,fontSize:9,fontWeight:500,color:"rgba(223,247,247,0.7)",maxWidth:156,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
-                {selectedLanguage?.name} · {region}
+                {userProfile.name||"Guest"} · {selectedLanguage?.name} · {region}
               </div>
               {/* timer */}
               <div style={{position:"absolute",top:16,right:16,zIndex:2,padding:"5px 13px",borderRadius:100,background:"rgba(18,13,16,0.6)",backdropFilter:"blur(8px)",border:"1px solid rgba(196,146,138,0.1)",fontFamily:sans,fontSize:12,fontWeight:400,color:T.muted}}>{fmt(callTime)}</div>
@@ -809,7 +917,7 @@ function App(){
               <div className="glass" style={{padding:18,animation:"fadeUp 0.22s ease"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
                   <span style={{fontFamily:serif,fontStyle:"italic",fontSize:16,color:T.cream}}>a grace gift</span>
-                  <span style={{fontFamily:sans,fontSize:13,fontWeight:500,color:T.gold}}>❧ {coins.toLocaleString()}</span>
+                  <span style={{fontFamily:sans,fontSize:13,fontWeight:500,color:T.gold}}>{userProfile.name||"Guest"} · ❧ {coins.toLocaleString()}</span>
                 </div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
                   {GIFTS.map(g=>{
@@ -857,9 +965,12 @@ function App(){
                 ))}
               </div>
             </div>
-            <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.24em",color:"rgba(196,146,138,0.4)",textTransform:"uppercase",marginBottom:10}}>Nearby · {profile.city}</p>
+            <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.24em",color:"rgba(196,146,138,0.4)",textTransform:"uppercase",marginBottom:6}}>Nearby · {location?userProfile.city||region:profile.city}</p>
+            <p style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:restaurantStatus==="error"?"rgba(212,160,168,0.72)":T.muted,marginBottom:10}}>
+              {restaurantStatus==="loading"?"Finding real nearby restaurants…":restaurantStatus==="loaded"?"Real places loaded from OpenStreetMap.":restaurantStatus==="error"?restaurantError:"Choose a place for the date."}
+            </p>
             <div className="scroll-thin" style={{maxHeight:290,overflowY:"auto",paddingRight:2}}>
-              {RESTAURANTS.map(r=>(
+              {restaurants.map(r=>(
                 <RestaurantCard key={r.id} r={r} selected={selectedRest?.id===r.id} onSelect={r=>{setSelectedRest(r);setSelectedTime(null);}}/>
               ))}
             </div>
