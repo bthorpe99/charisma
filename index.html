@@ -246,7 +246,10 @@ const REGIONS_BY_LANGUAGE={
   fr:["France","Canada - Quebec","Haiti","Senegal"],
   pt:["Brazil","Portugal","Angola","Cape Verde"]
 };
-const DEFAULT_PROFILE={name:"",age:"",city:"",intent:"Real dates",wallet:1200,giftsSent:[],giftsReceived:[]};
+const FREE_REVEAL_LIMIT=6;
+const ACCESS_RESET_MS=24*60*60*1000;
+const DEFAULT_ACCESS={windowStart:Date.now(),callsUsed:0};
+const DEFAULT_PROFILE={name:"",age:"",city:"",role:"",intent:"Real dates",wallet:1200,isMember:false,giftsSent:[],giftsReceived:[]};
 const LIVE_SITE_URL="https://bthorpe99.github.io/charisma/";
 const BACKGROUND_VIDEOS=[
   "assets/videos/date-night-smile.mp4",
@@ -423,6 +426,13 @@ function App(){
     try{return {...DEFAULT_PROFILE,...JSON.parse(localStorage.getItem("charismaProfile")||"{}")};}
     catch(err){return DEFAULT_PROFILE;}
   });
+  const [revealAccess,setRevealAccess]=useState(()=>{
+    try{
+      const saved={...DEFAULT_ACCESS,...JSON.parse(localStorage.getItem("charismaRevealAccess")||"{}")};
+      return Date.now()-saved.windowStart>=ACCESS_RESET_MS?DEFAULT_ACCESS:saved;
+    }catch(err){return DEFAULT_ACCESS;}
+  });
+  const [accessNotice,setAccessNotice]=useState("");
   const [coins,setCoins]=useState(()=>Number(userProfile.wallet)||1200);
   const [profile,setProfile]=useState(PROFILES[0]);
   const [kept,setKept]=useState([]);
@@ -490,7 +500,14 @@ function App(){
 
   const fmt=s=>`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
 
-  const profileComplete=Boolean(userProfile.name&&userProfile.age&&userProfile.city);
+  const isWoman=userProfile.role==="Woman";
+  const isMember=Boolean(userProfile.isMember);
+  const accessExpired=Date.now()-revealAccess.windowStart>=ACCESS_RESET_MS;
+  const activeAccess=accessExpired?DEFAULT_ACCESS:revealAccess;
+  const freeCallsLeft=Math.max(0,FREE_REVEAL_LIMIT-activeAccess.callsUsed);
+  const hasUnlimitedAccess=isWoman||isMember;
+  const canStartReveal=hasUnlimitedAccess||freeCallsLeft>0;
+  const profileComplete=Boolean(userProfile.name&&userProfile.age&&userProfile.city&&userProfile.role);
 
   const saveProfile=()=>{
     const next={
@@ -498,12 +515,39 @@ function App(){
       name:String(profileDraft.name||"").trim(),
       age:String(profileDraft.age||"").trim(),
       city:String(profileDraft.city||"").trim(),
+      role:profileDraft.role||"",
       intent:profileDraft.intent||"Real dates",
+      isMember:Boolean(profileDraft.isMember),
       wallet:Number(profileDraft.wallet)||coins||1200
     };
     setUserProfile(next);
     setCoins(next.wallet);
     localStorage.setItem("charismaProfile",JSON.stringify(next));
+  };
+
+  const upgradeMembership=()=>{
+    const next={...userProfile,isMember:true};
+    setUserProfile(next);
+    setProfileDraft(p=>({...p,isMember:true}));
+    localStorage.setItem("charismaProfile",JSON.stringify(next));
+    setAccessNotice("Beta membership unlocked. Replace this with Stripe Checkout when your payment link is ready.");
+  };
+
+  const recordRevealStart=()=>{
+    setAccessNotice("");
+    if(hasUnlimitedAccess)return true;
+    const now=Date.now();
+    const current=now-activeAccess.windowStart>=ACCESS_RESET_MS?{windowStart:now,callsUsed:0}:activeAccess;
+    if(current.callsUsed>=FREE_REVEAL_LIMIT){
+      setRevealAccess(current);
+      localStorage.setItem("charismaRevealAccess",JSON.stringify(current));
+      setAccessNotice("You used your 6 free reveal calls. Wait 24 hours or get membership for unlimited searching.");
+      return false;
+    }
+    const next={...current,callsUsed:current.callsUsed+1};
+    setRevealAccess(next);
+    localStorage.setItem("charismaRevealAccess",JSON.stringify(next));
+    return true;
   };
 
   const milesBetween=(lat1,lng1,lat2,lng2)=>{
@@ -704,6 +748,7 @@ function App(){
 
   const startOver=async()=>{
     if(!profileComplete||!language||!region||locationStatus!=="confirmed"||cameraStatus!=="live")return;
+    if(!recordRevealStart())return;
     profileIndex=0;
     setProfile(PROFILES[profileIndex]);
     setSentGifts([]);setShowGifts(false);
@@ -713,6 +758,10 @@ function App(){
 
   const goNext=()=>{
     clearInterval(timerRef.current);clearInterval(blurRef.current);
+    if(!recordRevealStart()){
+      setScreen("home");
+      return;
+    }
     profileIndex=(profileIndex+1)%PROFILES.length;
     setProfile(PROFILES[profileIndex]);
     setSentGifts([]);setFloating([]);setShowGifts(false);
@@ -811,13 +860,33 @@ function App(){
                   {["Real dates","Dinner tonight","Long-term chemistry","Casual but intentional"].map(v=><option key={v} value={v}>{v}</option>)}
                 </select>
               </div>
+              <div style={{marginBottom:12}}>
+                <div style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted,marginBottom:8}}>Choose your access type</div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8}}>
+                  {["Man","Woman"].map(role=>(
+                    <button key={role} className="btn" onClick={()=>setProfileDraft(p=>({...p,role}))} style={{padding:"11px 8px",borderRadius:11,fontSize:12,background:profileDraft.role===role?"rgba(196,146,138,0.18)":"rgba(196,146,138,0.06)",border:profileDraft.role===role?"1px solid rgba(196,146,138,0.5)":"1px solid rgba(196,146,138,0.12)",color:profileDraft.role===role?T.cream:T.muted}}>{role==="Woman"?"I'm a woman - free":"I'm a man"}</button>
+                  ))}
+                </div>
+              </div>
               <div style={{display:"flex",gap:8,alignItems:"center"}}>
                 <button className="btn" onClick={saveProfile} style={{flex:1,padding:"12px 10px",borderRadius:12,fontSize:12,color:T.cream,background:"rgba(196,146,138,0.14)",border:"1px solid rgba(196,146,138,0.25)",letterSpacing:"0.08em"}}>{profileComplete?"Update profile":"Save profile"}</button>
                 <div style={{padding:"10px 12px",borderRadius:12,background:"rgba(201,168,122,0.1)",border:"1px solid rgba(201,168,122,0.18)",fontFamily:sans,fontSize:12,color:T.gold,whiteSpace:"nowrap"}}>❧ {coins.toLocaleString()}</div>
               </div>
               <p style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:profileComplete?"rgba(154,220,190,0.75)":"rgba(154,136,128,0.58)",lineHeight:1.45,marginTop:10,textAlign:"center"}}>
-                {profileComplete?`${userProfile.name}, ${userProfile.age} · ${userProfile.city} · ${userProfile.intent}`:"Save a profile so gifts and Grace Points belong to someone."}
+                {profileComplete?`${userProfile.name}, ${userProfile.age} · ${userProfile.city} · ${userProfile.role} · ${userProfile.intent}`:"Save a profile so gifts and Grace Points belong to someone."}
               </p>
+            </div>
+            <div className="glass" style={{padding:"16px 18px",marginBottom:22,textAlign:"left"}}>
+              <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.24em",color:"rgba(196,146,138,0.45)",textTransform:"uppercase",marginBottom:10}}>Access</p>
+              <p style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted,lineHeight:1.55,marginBottom:12}}>
+                {isWoman?"Women search free during beta.":isMember?"Membership active. Unlimited reveal calls are unlocked.":`${freeCallsLeft} of ${FREE_REVEAL_LIMIT} free reveal calls left today. Resets every 24 hours.`}
+              </p>
+              {!isWoman&&!isMember&&(
+                <button className="btn" onClick={upgradeMembership} style={{width:"100%",padding:"12px 10px",borderRadius:12,fontSize:12,color:T.cream,background:"rgba(201,168,122,0.12)",border:"1px solid rgba(201,168,122,0.28)",letterSpacing:"0.08em"}}>
+                  Get membership for unlimited
+                </button>
+              )}
+              {accessNotice&&<p style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:"rgba(212,160,168,0.82)",lineHeight:1.45,marginTop:10,textAlign:"center"}}>{accessNotice}</p>}
             </div>
             <div className="glass" style={{padding:"18px 18px",marginBottom:22,textAlign:"left"}}>
               <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.24em",color:"rgba(196,146,138,0.45)",textTransform:"uppercase",marginBottom:12}}>Match setup</p>
