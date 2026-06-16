@@ -541,7 +541,7 @@ function App(){
     if(current.callsUsed>=FREE_REVEAL_LIMIT){
       setRevealAccess(current);
       localStorage.setItem("charismaRevealAccess",JSON.stringify(current));
-      setAccessNotice("You used your 6 free reveal calls. Wait 24 hours or get membership for unlimited searching.");
+      setAccessNotice("Your free reveal access is done for today. Wait 24 hours or get membership for unlimited searching.");
       return false;
     }
     const next={...current,callsUsed:current.callsUsed+1};
@@ -879,7 +879,7 @@ function App(){
             <div className="glass" style={{padding:"16px 18px",marginBottom:22,textAlign:"left"}}>
               <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.24em",color:"rgba(196,146,138,0.45)",textTransform:"uppercase",marginBottom:10}}>Access</p>
               <p style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted,lineHeight:1.55,marginBottom:12}}>
-                {isWoman?"Women search free during beta.":isMember?"Membership active. Unlimited reveal calls are unlocked.":`${freeCallsLeft} of ${FREE_REVEAL_LIMIT} free reveal calls left today. Resets every 24 hours.`}
+                {isWoman?"Search is open during beta.":isMember?"Membership active. Unlimited reveal calls are unlocked.":"Daily beta access is active. Membership unlocks unlimited searching."}
               </p>
               {!isWoman&&!isMember&&(
                 <button className="btn" onClick={upgradeMembership} style={{width:"100%",padding:"12px 10px",borderRadius:12,fontSize:12,color:T.cream,background:"rgba(201,168,122,0.12)",border:"1px solid rgba(201,168,122,0.28)",letterSpacing:"0.08em"}}>
