@@ -41,6 +41,10 @@
 <script type="text/babel">
 const {useState,useEffect,useRef}=React;
 
+const REVEAL_SECONDS=60;
+const INITIAL_REVEAL_BLUR=22;
+const REVEAL_BLUR_STEP=INITIAL_REVEAL_BLUR/REVEAL_SECONDS;
+
 const GIFTS=[
   {id:1,emoji:"🌸",name:"Petal",   price:50, color:"#d4a0a0"},
   {id:2,emoji:"🕯️",name:"Candle",  price:75, color:"#c9a87a"},
@@ -409,7 +413,7 @@ const CharismaFooter=({onStart})=>{
 function App(){
   const [screen,setScreen]=useState("home");
   const [callTime,setCallTime]=useState(0);
-  const [blurAmount,setBlurAmount]=useState(22);
+  const [blurAmount,setBlurAmount]=useState(INITIAL_REVEAL_BLUR);
   const [revealMsg,setRevealMsg]=useState(null);
   const [userProfile,setUserProfile]=useState(()=>{
     try{return {...DEFAULT_PROFILE,...JSON.parse(localStorage.getItem("charismaProfile")||"{}")};}
@@ -455,11 +459,11 @@ function App(){
 
   useEffect(()=>{
     if(screen!=="call")return;
-    setCallTime(0);setBlurAmount(22);setRevealMsg(null);
+    setCallTime(0);setBlurAmount(INITIAL_REVEAL_BLUR);setRevealMsg(null);
     timerRef.current=setInterval(()=>setCallTime(t=>t+1),1000);
     blurRef.current=setInterval(()=>{
       setBlurAmount(prev=>{
-        const next=Math.max(0,prev-0.18);
+        const next=Math.max(0,prev-REVEAL_BLUR_STEP);
         if(prev>0&&next===0)setRevealMsg("the moment has arrived");
         return next;
       });
@@ -782,7 +786,7 @@ function App(){
               <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.28em",color:"rgba(196,146,138,0.45)",textTransform:"uppercase",marginBottom:18}}>The experience</p>
               {[
                 ["❧","Instant connection","Drop into a live call — no waiting, no accepting"],
-                ["◑","The slow reveal","Two minutes of voice & energy before they unblur"],
+                ["◑","The slow reveal","One minute of voice & energy before they unblur"],
                 ["🌸","Send a grace gift","A gentle way to show you're feeling the connection"],
                 ["📍","Book the evening","After a match, reserve a table together in the app"],
               ].map(([ic,ttl,desc])=>(
@@ -900,9 +904,9 @@ function App(){
                 {blurAmount>0?(
                   <>
                     <div style={{width:"100%",height:2,borderRadius:100,background:"rgba(196,146,138,0.12)",marginBottom:8,overflow:"hidden"}}>
-                      <div style={{height:"100%",borderRadius:100,background:"linear-gradient(90deg,#c4928a,#d4a0a8)",width:`${100-(blurAmount/22)*100}%`,transition:"width 1s linear"}}/>
+                      <div style={{height:"100%",borderRadius:100,background:"linear-gradient(90deg,#c4928a,#d4a0a8)",width:`${100-(blurAmount/INITIAL_REVEAL_BLUR)*100}%`,transition:"width 1s linear"}}/>
                     </div>
-                    <span style={{fontFamily:body,fontStyle:"italic",fontSize:11,color:"rgba(196,146,138,0.38)"}}>revealing in {Math.ceil(blurAmount/0.18)}s</span>
+                    <span style={{fontFamily:body,fontStyle:"italic",fontSize:11,color:"rgba(196,146,138,0.38)"}}>revealing in {Math.ceil(blurAmount/REVEAL_BLUR_STEP)}s</span>
                   </>
                 ):(
                   <span style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:"rgba(196,146,138,0.7)",letterSpacing:"0.06em"}}>❧ revealed</span>
