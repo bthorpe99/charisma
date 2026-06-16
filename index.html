@@ -678,9 +678,11 @@ function App(){
     setBookingDone(true);
   };
 
-  const continueAfterBooking=async()=>{
-    const invite=await ensureBetaInvite();
-    if(invite.callUrl)window.open(invite.callUrl,"_blank","noopener,noreferrer");
+  const keepSearchingAfterBooking=()=>{
+    setSelectedRest(null);
+    setSelectedTime(null);
+    setBookingDone(false);
+    goNext();
   };
 
   const sendGift=g=>{
@@ -715,7 +717,6 @@ function App(){
 
   const goKeep=()=>{
     clearInterval(timerRef.current);clearInterval(blurRef.current);
-    stopCamera();
     setKept(p=>[...p,profile]);
     setShowGifts(false);
     setSelectedRest(null);setSelectedTime(null);setBookingDone(false);
@@ -1065,9 +1066,9 @@ function App(){
             {betaInviteLink&&(
               <div style={{padding:"10px 12px",borderRadius:10,background:"rgba(18,13,16,0.45)",border:"1px solid rgba(196,146,138,0.1)",fontFamily:sans,fontSize:10,color:"rgba(245,236,230,0.72)",lineHeight:1.45,wordBreak:"break-all",marginBottom:12,textAlign:"left"}}>{betaInviteLink}</div>
             )}
-            <button className="btn" onClick={continueAfterBooking} style={{width:"100%",padding:"16px 0",borderRadius:13,fontSize:14,color:T.cream,background:"linear-gradient(145deg,#c4928a,#a06870)",boxShadow:"0 6px 32px rgba(196,146,138,0.25)",letterSpacing:"0.07em",marginBottom:10}}>{inviteCopied?"Invite copied - opening room":"Continue to live room ❧"}</button>
+            <button className="btn" onClick={keepSearchingAfterBooking} style={{width:"100%",padding:"16px 0",borderRadius:13,fontSize:14,color:T.cream,background:"linear-gradient(145deg,#c4928a,#a06870)",boxShadow:"0 6px 32px rgba(196,146,138,0.25)",letterSpacing:"0.07em",marginBottom:10}}>Keep searching ❧</button>
             {betaCallUrl&&(
-              <button className="btn" onClick={()=>window.open(betaCallUrl,"_blank","noopener,noreferrer")} style={{width:"100%",padding:"12px 0",borderRadius:13,fontSize:13,color:T.cream,background:T.card,border:`1px solid ${T.border}`,letterSpacing:"0.04em",marginBottom:10}}>Open live room again</button>
+              <button className="btn" onClick={()=>window.open(betaCallUrl,"_blank","noopener,noreferrer")} style={{width:"100%",padding:"12px 0",borderRadius:13,fontSize:13,color:T.cream,background:T.card,border:`1px solid ${T.border}`,letterSpacing:"0.04em",marginBottom:10}}>Open invite room</button>
             )}
             <button className="btn" onClick={goHome} style={{width:"100%",padding:"12px 0",borderRadius:13,fontSize:13,color:T.muted,background:"transparent",border:"none",fontFamily:body,fontStyle:"italic"}}>Back home</button>
           </div>
