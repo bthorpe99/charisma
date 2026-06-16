@@ -434,6 +434,10 @@ function App(){
   const [bookingDate,setBookingDate]=useState("Tonight");
   const [bookingParty,setBookingParty]=useState(2);
   const [bookingDone,setBookingDone]=useState(false);
+  const [datePlans,setDatePlans]=useState(()=>{
+    try{return JSON.parse(localStorage.getItem("charismaDatePlans")||"[]");}
+    catch(err){return [];}
+  });
   const [cameraStatus,setCameraStatus]=useState("idle");
   const [cameraError,setCameraError]=useState("");
   const [language,setLanguage]=useState("");
@@ -619,21 +623,64 @@ function App(){
 
   const makeRoomId=()=>`charisma-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
 
-  const createBetaInvite=async()=>{
+  const getPublicBase=()=>window.location.hostname==="localhost"||window.location.hostname==="127.0.0.1"?LIVE_SITE_URL:`${window.location.origin}${window.location.pathname}`;
+  const getInviteLink=room=>{
+    const base=getPublicBase();
+    return `${base}${base.includes("?")?"&":"?"}room=${encodeURIComponent(room)}`;
+  };
+  const getCallUrl=room=>`https://meet.jit.si/${encodeURIComponent(room)}#config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false&interfaceConfig.SHOW_JITSI_WATERMARK=false`;
+
+  const copyText=async text=>{
+    try{
+      await navigator.clipboard?.writeText(text);
+      setInviteCopied(true);
+      setTimeout(()=>setInviteCopied(false),2400);
+      return true;
+    }catch(err){
+      setInviteCopied(false);
+      return false;
+    }
+  };
+
+  const ensureBetaInvite=async()=>{
     const nextRoom=betaRoom||makeRoomId();
     setBetaRoom(nextRoom);
     const localUrl=new URL(window.location.href);
     localUrl.searchParams.set("room",nextRoom);
     window.history.replaceState(null,"",localUrl.toString());
-    const base=window.location.hostname==="localhost"||window.location.hostname==="127.0.0.1"?LIVE_SITE_URL:`${window.location.origin}${window.location.pathname}`;
-    const inviteUrl=`${base}${base.includes("?")?"&":"?"}room=${encodeURIComponent(nextRoom)}`;
-    try{
-      await navigator.clipboard?.writeText(inviteUrl);
-      setInviteCopied(true);
-      setTimeout(()=>setInviteCopied(false),2400);
-    }catch(err){
-      setInviteCopied(false);
-    }
+    const inviteUrl=getInviteLink(nextRoom);
+    await copyText(inviteUrl);
+    return {room:nextRoom,inviteUrl,callUrl:getCallUrl(nextRoom)};
+  };
+
+  const createBetaInvite=async()=>{
+    await ensureBetaInvite();
+  };
+
+  const saveDatePlan=()=>{
+    if(!selectedRest||!selectedTime)return;
+    const plan={
+      id:`plan-${Date.now()}`,
+      with:profile.name,
+      place:selectedRest.name,
+      neighborhood:selectedRest.neighborhood,
+      date:bookingDate,
+      time:selectedTime,
+      party:bookingParty,
+      status:"Awaiting confirmation",
+      createdAt:new Date().toISOString()
+    };
+    setDatePlans(prev=>{
+      const next=[plan,...prev].slice(0,8);
+      localStorage.setItem("charismaDatePlans",JSON.stringify(next));
+      return next;
+    });
+    setBookingDone(true);
+  };
+
+  const continueAfterBooking=async()=>{
+    const invite=await ensureBetaInvite();
+    if(invite.callUrl)window.open(invite.callUrl,"_blank","noopener,noreferrer");
   };
 
   const sendGift=g=>{
@@ -687,9 +734,8 @@ function App(){
   const availableRegions=language?REGIONS_BY_LANGUAGE[language]:[];
   const setupComplete=Boolean(profileComplete&&language&&region&&locationStatus==="confirmed"&&cameraStatus==="live");
   const locationLabel=location?`${location.lat.toFixed(2)}, ${location.lng.toFixed(2)}`:"region only";
-  const publicBase=window.location.hostname==="localhost"||window.location.hostname==="127.0.0.1"?LIVE_SITE_URL:`${window.location.origin}${window.location.pathname}`;
-  const betaInviteLink=betaRoom?`${publicBase}${publicBase.includes("?")?"&":"?"}room=${encodeURIComponent(betaRoom)}`:"";
-  const betaCallUrl=betaRoom?`https://meet.jit.si/${encodeURIComponent(betaRoom)}#config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false&interfaceConfig.SHOW_JITSI_WATERMARK=false`:"";
+  const betaInviteLink=betaRoom?getInviteLink(betaRoom):"";
+  const betaCallUrl=betaRoom?getCallUrl(betaRoom):"";
 
   return(
     <div style={{minHeight:"100vh",background:"rgba(18,13,16,0.72)",fontFamily:body,color:T.text,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:screen==="home"?"flex-start":"center",overflowX:"hidden",overflowY:screen==="home"?"auto":"hidden",position:"relative"}}>
@@ -982,12 +1028,12 @@ function App(){
               </div>
             )}
             {selectedRest&&selectedTime&&(
-              <button className="btn" onClick={()=>setBookingDone(true)} style={{width:"100%",marginTop:12,padding:"17px 0",borderRadius:14,fontSize:14,color:T.cream,letterSpacing:"0.07em",background:"linear-gradient(145deg,#c4928a,#a06870)",boxShadow:"0 6px 32px rgba(196,146,138,0.28)",animation:"fadeUp 0.25s ease"}}>
+              <button className="btn" onClick={saveDatePlan} style={{width:"100%",marginTop:12,padding:"17px 0",borderRadius:14,fontSize:14,color:T.cream,letterSpacing:"0.07em",background:"linear-gradient(145deg,#c4928a,#a06870)",boxShadow:"0 6px 32px rgba(196,146,138,0.28)",animation:"fadeUp 0.25s ease"}}>
                 Reserve · {bookingParty} guests · {selectedTime} ❧
               </button>
             )}
             <div style={{display:"flex",gap:8,marginTop:11}}>
-              <button className="btn" onClick={startOver} style={{flex:1,padding:"13px 0",borderRadius:13,fontSize:13,color:T.cream,background:T.card,border:`1px solid ${T.border}`,letterSpacing:"0.04em"}}>Continue</button>
+              <button className="btn" onClick={createBetaInvite} style={{flex:1,padding:"13px 0",borderRadius:13,fontSize:13,color:T.cream,background:T.card,border:`1px solid ${T.border}`,letterSpacing:"0.04em"}}>{inviteCopied?"Invite copied":"Copy invite"}</button>
               <button className="btn" onClick={goHome} style={{flex:1,padding:"13px 0",borderRadius:13,fontSize:13,color:T.muted,background:"transparent",border:"1px solid rgba(196,146,138,0.08)",fontFamily:body,fontStyle:"italic"}}>Back home</button>
             </div>
           </div>
@@ -1016,7 +1062,13 @@ function App(){
                 </div>
               ))}
             </div>
-            <button className="btn" onClick={startOver} style={{width:"100%",padding:"16px 0",borderRadius:13,fontSize:14,color:T.cream,background:"linear-gradient(145deg,#c4928a,#a06870)",boxShadow:"0 6px 32px rgba(196,146,138,0.25)",letterSpacing:"0.07em",marginBottom:10}}>Continue ❧</button>
+            {betaInviteLink&&(
+              <div style={{padding:"10px 12px",borderRadius:10,background:"rgba(18,13,16,0.45)",border:"1px solid rgba(196,146,138,0.1)",fontFamily:sans,fontSize:10,color:"rgba(245,236,230,0.72)",lineHeight:1.45,wordBreak:"break-all",marginBottom:12,textAlign:"left"}}>{betaInviteLink}</div>
+            )}
+            <button className="btn" onClick={continueAfterBooking} style={{width:"100%",padding:"16px 0",borderRadius:13,fontSize:14,color:T.cream,background:"linear-gradient(145deg,#c4928a,#a06870)",boxShadow:"0 6px 32px rgba(196,146,138,0.25)",letterSpacing:"0.07em",marginBottom:10}}>{inviteCopied?"Invite copied - opening room":"Continue to live room ❧"}</button>
+            {betaCallUrl&&(
+              <button className="btn" onClick={()=>window.open(betaCallUrl,"_blank","noopener,noreferrer")} style={{width:"100%",padding:"12px 0",borderRadius:13,fontSize:13,color:T.cream,background:T.card,border:`1px solid ${T.border}`,letterSpacing:"0.04em",marginBottom:10}}>Open live room again</button>
+            )}
             <button className="btn" onClick={goHome} style={{width:"100%",padding:"12px 0",borderRadius:13,fontSize:13,color:T.muted,background:"transparent",border:"none",fontFamily:body,fontStyle:"italic"}}>Back home</button>
           </div>
         )}
