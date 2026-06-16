@@ -487,10 +487,17 @@ function App(){
     return()=>clearTimeout(t);
   },[revealMsg]);
 
-  useEffect(()=>{
+  const attachCameraStream=()=>{
     if(videoRef.current&&streamRef.current){
       videoRef.current.srcObject=streamRef.current;
+      videoRef.current.play?.().catch(()=>{});
     }
+  };
+
+  const cameraIsLive=()=>Boolean(streamRef.current&&streamRef.current.getVideoTracks().some(track=>track.readyState==="live"));
+
+  useEffect(()=>{
+    attachCameraStream();
   },[screen,cameraStatus]);
 
   useEffect(()=>{
@@ -609,6 +616,15 @@ function App(){
     setCameraStatus("idle");
   };
 
+  const ensureCameraLive=async()=>{
+    if(cameraIsLive()){
+      setCameraStatus("live");
+      attachCameraStream();
+      return true;
+    }
+    return await startCamera();
+  };
+
   const startCamera=async()=>{
     if(!navigator.mediaDevices?.getUserMedia){
       setCameraStatus("error");
@@ -622,8 +638,14 @@ function App(){
         video:{facingMode:"user",width:{ideal:640},height:{ideal:960}},
         audio:false
       });
+      if(streamRef.current&&streamRef.current!==stream){
+        streamRef.current.getTracks().forEach(track=>track.stop());
+      }
       streamRef.current=stream;
-      if(videoRef.current)videoRef.current.srcObject=stream;
+      stream.getVideoTracks().forEach(track=>{
+        track.onended=()=>setCameraStatus("idle");
+      });
+      attachCameraStream();
       setCameraStatus("live");
       return true;
     }catch(err){
@@ -747,7 +769,8 @@ function App(){
   };
 
   const startOver=async()=>{
-    if(!profileComplete||!language||!region||locationStatus!=="confirmed"||cameraStatus!=="live")return;
+    if(!profileComplete||!language||!region||locationStatus!=="confirmed")return;
+    if(!await ensureCameraLive())return;
     if(!recordRevealStart())return;
     profileIndex=0;
     setProfile(PROFILES[profileIndex]);
@@ -756,8 +779,12 @@ function App(){
     setScreen("connecting");
   };
 
-  const goNext=()=>{
+  const goNext=async()=>{
     clearInterval(timerRef.current);clearInterval(blurRef.current);
+    if(!await ensureCameraLive()){
+      setScreen("home");
+      return;
+    }
     if(!recordRevealStart()){
       setScreen("home");
       return;
@@ -958,18 +985,10 @@ function App(){
               <div style={{position:"absolute",top:-46,left:"50%",padding:"9px 24px",borderRadius:100,zIndex:130,background:"rgba(196,146,138,0.88)",backdropFilter:"blur(10px)",fontFamily:body,fontStyle:"italic",fontSize:14,color:"#fff",animation:"revealFloat 3.2s ease forwards",whiteSpace:"nowrap",letterSpacing:"0.04em"}}>{revealMsg}</div>
             )}
             <div style={{width:"100%",aspectRatio:"9/16",borderRadius:24,overflow:"hidden",background:`linear-gradient(175deg,${profile.hue}14 0%,${T.surface} 50%,${T.bg} 100%)`,border:pulseRing?"1px solid rgba(196,146,138,0.5)":"1px solid rgba(196,146,138,0.1)",position:"relative",marginBottom:12,boxShadow:pulseRing?"0 0 50px rgba(196,146,138,0.2),0 16px 60px rgba(0,0,0,0.6)":"0 16px 60px rgba(0,0,0,0.55)",transition:"border 0.5s,box-shadow 0.5s"}}>
-              {betaRoom&&(
-                <iframe
-                  title="Charisma beta live room"
-                  src={betaCallUrl}
-                  allow="camera; microphone; fullscreen; display-capture; autoplay"
-                  style={{position:"absolute",inset:0,width:"100%",height:"100%",border:0,background:"#111",zIndex:1}}
-                />
-              )}
               {/* blurred avatar */}
-              {!betaRoom&&<div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-60%)",width:118,height:118,borderRadius:"50%",background:`radial-gradient(circle at 35% 35%,${profile.hue}ee,${profile.hue}55)`,border:`2px solid ${profile.hue}44`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:serif,fontSize:50,fontWeight:300,color:T.cream,filter:`blur(${blurAmount*0.32}px)`,transition:"filter 1.4s ease,box-shadow 1.2s ease",boxShadow:blurAmount===0?`0 0 80px ${profile.hue}55,0 0 0 10px ${profile.hue}18`:`0 0 50px ${profile.hue}28`}}>{profile.avatar}</div>}
+              <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-60%)",width:118,height:118,borderRadius:"50%",background:`radial-gradient(circle at 35% 35%,${profile.hue}ee,${profile.hue}55)`,border:`2px solid ${profile.hue}44`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:serif,fontSize:50,fontWeight:300,color:T.cream,filter:`blur(${blurAmount*0.32}px)`,transition:"filter 1.4s ease,box-shadow 1.2s ease",boxShadow:blurAmount===0?`0 0 80px ${profile.hue}55,0 0 0 10px ${profile.hue}18`:`0 0 50px ${profile.hue}28`}}>{profile.avatar}</div>
               {/* reveal bar */}
-              {!betaRoom&&<div style={{position:"absolute",top:"67%",left:"50%",transform:"translateX(-50%)",width:130,textAlign:"center"}}>
+              <div style={{position:"absolute",top:"67%",left:"50%",transform:"translateX(-50%)",width:130,textAlign:"center"}}>
                 {blurAmount>0?(
                   <>
                     <div style={{width:"100%",height:2,borderRadius:100,background:"rgba(196,146,138,0.12)",marginBottom:8,overflow:"hidden"}}>
@@ -980,7 +999,7 @@ function App(){
                 ):(
                   <span style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:"rgba(196,146,138,0.7)",letterSpacing:"0.06em"}}>❧ revealed</span>
                 )}
-              </div>}
+              </div>
               {/* LIVE pill */}
               <div style={{position:"absolute",top:16,left:16,zIndex:2,display:"flex",alignItems:"center",gap:6,padding:"5px 13px",borderRadius:100,background:"rgba(18,13,16,0.7)",backdropFilter:"blur(8px)",border:"1px solid rgba(196,146,138,0.2)",fontFamily:sans,fontSize:10,fontWeight:600,letterSpacing:"0.18em",color:"rgba(196,146,138,0.7)"}}>
                 <span style={{width:5,height:5,borderRadius:"50%",background:T.rose,animation:"liveGlow 1.6s ease-in-out infinite",display:"inline-block"}}/>
@@ -1002,10 +1021,10 @@ function App(){
                 </div>
               </div>
               {/* name */}
-              {!betaRoom&&<div style={{position:"absolute",bottom:22,left:18,padding:"12px 18px",borderRadius:14,background:"rgba(18,13,16,0.75)",backdropFilter:"blur(14px)",border:"1px solid rgba(196,146,138,0.1)"}}>
+              <div style={{position:"absolute",bottom:22,left:18,padding:"12px 18px",borderRadius:14,background:"rgba(18,13,16,0.75)",backdropFilter:"blur(14px)",border:"1px solid rgba(196,146,138,0.1)"}}>
                 <div style={{fontFamily:serif,fontWeight:400,fontSize:19,color:T.cream}}>{profile.name}, {profile.age}</div>
                 <div style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:T.muted,marginTop:3}}>{profile.city} · {profile.vibe}</div>
-              </div>}
+              </div>
               {sentGifts.length>0&&(
                 <div style={{position:"absolute",bottom:26,right:14,display:"flex",flexDirection:"column",gap:4,alignItems:"flex-end"}}>
                   {sentGifts.slice(-4).map((g,i)=><span key={i} style={{fontSize:19,filter:"drop-shadow(0 2px 6px rgba(0,0,0,0.7))"}}>{g.emoji}</span>)}
