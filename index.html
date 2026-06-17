@@ -906,10 +906,6 @@ function App(){
     }catch(err){}
   };
 
-  const openLiveMeet=()=>{
-    if(matchCallUrl)window.open(matchCallUrl,"_blank","noopener,noreferrer");
-  };
-
   const handleMatchedRequest=data=>{
     const room=data.room||makeRoomId();
     const callUrl=data.callUrl||getCallUrl(room);
@@ -917,9 +913,9 @@ function App(){
     setMatchCallUrl(callUrl);
     setMatchedProfileName(data.matchedName||"someone nearby");
     setMatchStatus("matched");
-    setSafetyNotice(`Matched with ${data.matchedName||"someone nearby"}. Enter the live meet when ready.`);
+    setSafetyNotice(`Matched with ${data.matchedName||"someone nearby"}. Your real video room is loading inside Charisma.`);
+    stopCamera();
     setScreen("call");
-    setTimeout(()=>window.open(callUrl,"_blank","noopener,noreferrer"),150);
   };
 
   const startNearbyMatch=async()=>{
@@ -1191,11 +1187,6 @@ function App(){
             <p style={{fontFamily:body,fontStyle:"italic",fontSize:14,lineHeight:1.65,color:T.muted,marginBottom:18}}>
               {matchStatus==="error"?matchError:`${selectedLanguage?.name||"Your language"} - ${region||"your region"} - ${locationLabel}. Keep this open while another close match starts.`}
             </p>
-            {matchCallUrl&&(
-              <button className="btn" onClick={openLiveMeet} style={{width:"100%",padding:"15px 0",borderRadius:14,fontSize:14,color:T.cream,letterSpacing:"0.08em",background:"linear-gradient(145deg,#c4928a,#a06870)",boxShadow:"0 8px 40px rgba(196,146,138,0.3)",marginBottom:10}}>
-                Enter live meet
-              </button>
-            )}
             <button className="btn" onClick={goHome} style={{width:"100%",padding:"12px 0",borderRadius:13,fontSize:13,color:T.muted,background:"transparent",border:"1px solid rgba(196,146,138,0.12)",fontFamily:body,fontStyle:"italic"}}>
               Cancel search
             </button>
@@ -1384,6 +1375,29 @@ function App(){
               <div style={{position:"absolute",top:-46,left:"50%",padding:"9px 24px",borderRadius:100,zIndex:130,background:"rgba(196,146,138,0.88)",backdropFilter:"blur(10px)",fontFamily:body,fontStyle:"italic",fontSize:14,color:"#fff",animation:"revealFloat 3.2s ease forwards",whiteSpace:"nowrap",letterSpacing:"0.04em"}}>{revealMsg}</div>
             )}
             <div style={{width:"100%",aspectRatio:"9/16",borderRadius:24,overflow:"hidden",background:`linear-gradient(175deg,${profile.hue}14 0%,${T.surface} 50%,${T.bg} 100%)`,border:pulseRing?"1px solid rgba(196,146,138,0.5)":"1px solid rgba(196,146,138,0.1)",position:"relative",marginBottom:12,boxShadow:pulseRing?"0 0 50px rgba(196,146,138,0.2),0 16px 60px rgba(0,0,0,0.6)":"0 16px 60px rgba(0,0,0,0.55)",transition:"border 0.5s,box-shadow 0.5s"}}>
+              {matchCallUrl?(
+                <>
+                  <iframe
+                    title="Charisma live match"
+                    src={matchCallUrl}
+                    allow="camera; microphone; fullscreen; display-capture; autoplay"
+                    style={{position:"absolute",inset:0,width:"100%",height:"100%",border:0,background:"#080608",zIndex:1}}
+                  />
+                  <div style={{position:"absolute",top:14,left:14,right:14,zIndex:3,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,pointerEvents:"none"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 12px",borderRadius:100,background:"rgba(18,13,16,0.76)",backdropFilter:"blur(8px)",border:"1px solid rgba(196,146,138,0.22)",fontFamily:sans,fontSize:10,fontWeight:600,letterSpacing:"0.14em",color:"rgba(245,236,230,0.84)"}}>
+                      <span style={{width:6,height:6,borderRadius:"50%",background:T.rose,animation:"liveGlow 1.6s ease-in-out infinite",display:"inline-block"}}/>
+                      REAL MATCH
+                    </div>
+                    <div style={{padding:"6px 10px",borderRadius:100,background:"rgba(18,13,16,0.72)",backdropFilter:"blur(8px)",border:"1px solid rgba(122,181,201,0.2)",fontFamily:sans,fontSize:10,color:"rgba(223,247,247,0.78)",maxWidth:170,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                      {matchedProfileName||"Nearby match"}
+                    </div>
+                  </div>
+                  <div style={{position:"absolute",left:14,right:14,bottom:14,zIndex:3,padding:"10px 12px",borderRadius:14,background:"rgba(18,13,16,0.68)",backdropFilter:"blur(10px)",border:"1px solid rgba(196,146,138,0.16)",fontFamily:body,fontStyle:"italic",fontSize:12,lineHeight:1.4,color:"rgba(245,236,230,0.78)",pointerEvents:"none"}}>
+                    If camera or mic asks again, allow it here. This is the real person room inside Charisma.
+                  </div>
+                </>
+              ):(
+                <>
               {/* blurred avatar */}
               <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-60%)",width:118,height:118,borderRadius:"50%",background:`radial-gradient(circle at 35% 35%,${profile.hue}ee,${profile.hue}55)`,border:`2px solid ${profile.hue}44`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:serif,fontSize:50,fontWeight:300,color:T.cream,filter:`blur(${blurAmount*0.32}px)`,transition:"filter 1.4s ease,box-shadow 1.2s ease",boxShadow:blurAmount===0?`0 0 80px ${profile.hue}55,0 0 0 10px ${profile.hue}18`:`0 0 50px ${profile.hue}28`}}>{profile.avatar}</div>
               {/* reveal bar */}
@@ -1429,8 +1443,11 @@ function App(){
                   {sentGifts.slice(-4).map((g,i)=><span key={i} style={{fontSize:19,filter:"drop-shadow(0 2px 6px rgba(0,0,0,0.7))"}}>{g.emoji}</span>)}
                 </div>
               )}
+                </>
+              )}
             </div>
             {/* self PIP */}
+            {!matchCallUrl&&(
             <div style={{position:"absolute",top:60,right:28,width:84,height:114,borderRadius:13,background:`linear-gradient(160deg,${T.card},${T.surface})`,border:cameraStatus==="live"?"1px solid rgba(122,181,201,0.55)":"1px solid rgba(196,146,138,0.18)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,color:"rgba(154,136,128,0.28)",backdropFilter:"blur(10px)",zIndex:10,boxShadow:cameraStatus==="live"?"0 0 24px rgba(122,181,201,0.18),0 4px 28px rgba(0,0,0,0.55)":"0 4px 28px rgba(0,0,0,0.55)",overflow:"hidden"}}>
               <video ref={videoRef} autoPlay playsInline muted style={{width:"100%",height:"100%",objectFit:"cover",transform:"scaleX(-1)",display:cameraStatus==="live"?"block":"none"}}/>
               {cameraStatus!=="live"&&(
@@ -1445,6 +1462,7 @@ function App(){
                 {cameraStatus==="live"?"camera live":cameraStatus==="error"?"blocked":"preview"}
               </div>
             </div>
+            )}
             {/* controls */}
             <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:8}}>
               <button className="btn" onClick={goNext} style={{flex:1,padding:"15px 0",borderRadius:13,fontSize:13,color:T.muted,background:T.card,border:`1px solid ${T.border}`,letterSpacing:"0.05em"}}>pass ⟶</button>
@@ -1457,9 +1475,6 @@ function App(){
               <button className="btn" onClick={blockProfile} style={{padding:"10px 0",borderRadius:11,fontSize:11,color:T.muted,background:"rgba(196,146,138,0.06)",border:"1px solid rgba(196,146,138,0.12)",letterSpacing:"0.06em"}}>Block</button>
               <button className="btn" onClick={endCall} style={{padding:"10px 0",borderRadius:11,fontSize:11,color:"rgba(245,236,230,0.86)",background:"rgba(212,160,168,0.12)",border:"1px solid rgba(212,160,168,0.24)",letterSpacing:"0.06em"}}>End</button>
             </div>
-            {matchCallUrl&&(
-              <button className="btn" onClick={openLiveMeet} style={{width:"100%",padding:"12px 0",borderRadius:13,fontSize:13,color:T.cream,background:"rgba(122,181,201,0.14)",border:"1px solid rgba(122,181,201,0.35)",letterSpacing:"0.06em",marginBottom:8}}>Enter live meet</button>
-            )}
             {showDatePlanner&&(
               <div className="glass" style={{padding:16,marginBottom:8,animation:"fadeUp 0.22s ease"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginBottom:12}}>
@@ -1616,9 +1631,6 @@ function App(){
               <p style={{fontFamily:body,fontStyle:"italic",fontSize:13,lineHeight:1.5,color:T.muted}}>Meet in public, keep your exact address private, and share your plans with someone you trust.</p>
             </div>
             <button className="btn" onClick={keepSearchingAfterBooking} style={{width:"100%",padding:"16px 0",borderRadius:13,fontSize:14,color:T.cream,background:"linear-gradient(145deg,#c4928a,#a06870)",boxShadow:"0 6px 32px rgba(196,146,138,0.25)",letterSpacing:"0.07em",marginBottom:10}}>Keep searching ❧</button>
-            {matchCallUrl&&(
-              <button className="btn" onClick={openLiveMeet} style={{width:"100%",padding:"12px 0",borderRadius:13,fontSize:13,color:T.cream,background:T.card,border:`1px solid ${T.border}`,letterSpacing:"0.04em",marginBottom:10}}>Enter live meet</button>
-            )}
             <button className="btn" onClick={goHome} style={{width:"100%",padding:"12px 0",borderRadius:13,fontSize:13,color:T.muted,background:"transparent",border:"none",fontFamily:body,fontStyle:"italic"}}>Back home</button>
           </div>
         )}
