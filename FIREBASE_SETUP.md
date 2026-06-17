@@ -33,9 +33,18 @@ service cloud.firestore {
     match /members/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
+    match /matchRequests/{userId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+    match /matches/{matchId} {
+      allow read, write: if true;
+    }
   }
 }
 ```
+
+Those open `matchRequests` and `matches` rules are only for quick beta testing of the live nearby queue. Before public launch, require Firebase Auth and restrict each match to its participants.
 
 ## 4. Public web config
 
@@ -82,6 +91,7 @@ Do not paste Firebase Admin SDK private keys into the website.
 - Stripe membership return unlocks the member account card.
 - Email/password creates a Firebase Auth user.
 - Charisma writes profile, wallet, membership, and gift history to `members/{uid}` in Firestore.
+- Charisma writes live nearby search requests to `matchRequests/{uid}` and matched rooms to `matches/{matchId}`.
 - If Firebase config is blank, the app still uses the local beta fallback.
 
 ## 7. Next production step

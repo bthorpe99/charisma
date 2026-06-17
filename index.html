@@ -525,8 +525,11 @@ function App(){
   const [locationStatus,setLocationStatus]=useState("idle");
   const [locationError,setLocationError]=useState("");
   const [location,setLocation]=useState(null);
-  const [betaRoom,setBetaRoom]=useState(()=>new URLSearchParams(window.location.search).get("room")||"");
-  const [inviteCopied,setInviteCopied]=useState(false);
+  const [matchStatus,setMatchStatus]=useState("idle");
+  const [matchError,setMatchError]=useState("");
+  const [matchRoom,setMatchRoom]=useState("");
+  const [matchCallUrl,setMatchCallUrl]=useState("");
+  const [matchedProfileName,setMatchedProfileName]=useState("");
   const [backgroundVideoIndex,setBackgroundVideoIndex]=useState(0);
   const [legalModal,setLegalModal]=useState(null);
   const [safetyNotice,setSafetyNotice]=useState("");
@@ -538,6 +541,7 @@ function App(){
   const blurRef=useRef(null);
   const videoRef=useRef(null);
   const streamRef=useRef(null);
+  const matchUnsubRef=useRef(null);
 
   useEffect(()=>{
     if(screen!=="call")return;
@@ -558,6 +562,8 @@ function App(){
     const t=setTimeout(()=>setRevealMsg(null),3200);
     return()=>clearTimeout(t);
   },[revealMsg]);
+
+  useEffect(()=>()=>{matchUnsubRef.current?.();},[]);
 
   const attachCameraStream=()=>{
     if(videoRef.current&&streamRef.current){
@@ -860,38 +866,149 @@ function App(){
 
   const makeRoomId=()=>`charisma-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
 
-  const getPublicBase=()=>window.location.hostname==="localhost"||window.location.hostname==="127.0.0.1"?LIVE_SITE_URL:`${window.location.origin}${window.location.pathname}`;
-  const getInviteLink=room=>{
-    const base=getPublicBase();
-    return `${base}${base.includes("?")?"&":"?"}room=${encodeURIComponent(room)}`;
-  };
   const getCallUrl=room=>`https://meet.jit.si/${encodeURIComponent(room)}#config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false&interfaceConfig.SHOW_JITSI_WATERMARK=false`;
 
-  const copyText=async text=>{
+  const toMatchRad=n=>n*Math.PI/180;
+  const matchMilesBetween=(a,b)=>{
+    if(!a||!b)return 0;
+    const R=3958.8;
+    const dLat=toMatchRad(b.lat-a.lat);
+    const dLng=toMatchRad(b.lng-a.lng);
+    const lat1=toMatchRad(a.lat);
+    const lat2=toMatchRad(b.lat);
+    const h=Math.sin(dLat/2)**2+Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)**2;
+    return 2*R*Math.asin(Math.min(1,Math.sqrt(h)));
+  };
+
+  const getMatchUid=()=>{
+    const services=getFirebaseServices();
+    const uid=services?.auth?.currentUser?.uid;
+    if(uid)return uid;
+    let guest=localStorage.getItem("charismaGuestId");
+    if(!guest){
+      guest=`guest-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
+      localStorage.setItem("charismaGuestId",guest);
+    }
+    return guest;
+  };
+
+  const leaveMatchQueue=async()=>{
+    matchUnsubRef.current?.();
+    matchUnsubRef.current=null;
+    const services=getFirebaseServices();
+    if(!services?.db)return;
     try{
-      await navigator.clipboard?.writeText(text);
-      setInviteCopied(true);
-      setTimeout(()=>setInviteCopied(false),2400);
-      return true;
-    }catch(err){
-      setInviteCopied(false);
+      const uid=getMatchUid();
+      await services.db.collection("matchRequests").doc(uid).set({
+        status:"left",
+        updatedAt:window.firebase.firestore.FieldValue.serverTimestamp()
+      },{merge:true});
+    }catch(err){}
+  };
+
+  const openLiveMeet=()=>{
+    if(matchCallUrl)window.open(matchCallUrl,"_blank","noopener,noreferrer");
+  };
+
+  const handleMatchedRequest=data=>{
+    const room=data.room||makeRoomId();
+    const callUrl=data.callUrl||getCallUrl(room);
+    setMatchRoom(room);
+    setMatchCallUrl(callUrl);
+    setMatchedProfileName(data.matchedName||"someone nearby");
+    setMatchStatus("matched");
+    setSafetyNotice(`Matched with ${data.matchedName||"someone nearby"}. Enter the live meet when ready.`);
+    setScreen("call");
+    setTimeout(()=>window.open(callUrl,"_blank","noopener,noreferrer"),150);
+  };
+
+  const startNearbyMatch=async()=>{
+    const services=getFirebaseServices();
+    setMatchStatus("searching");
+    setMatchError("");
+    setMatchRoom("");
+    setMatchCallUrl("");
+    setMatchedProfileName("");
+    if(!services?.db){
+      setMatchStatus("error");
+      setMatchError("Firebase is not ready yet. Refresh and try matching again.");
+      setScreen("connecting");
       return false;
     }
-  };
-
-  const ensureBetaInvite=async()=>{
-    const nextRoom=betaRoom||makeRoomId();
-    setBetaRoom(nextRoom);
-    const localUrl=new URL(window.location.href);
-    localUrl.searchParams.set("room",nextRoom);
-    window.history.replaceState(null,"",localUrl.toString());
-    const inviteUrl=getInviteLink(nextRoom);
-    await copyText(inviteUrl);
-    return {room:nextRoom,inviteUrl,callUrl:getCallUrl(nextRoom)};
-  };
-
-  const createBetaInvite=async()=>{
-    await ensureBetaInvite();
+    const uid=getMatchUid();
+    const requestRef=services.db.collection("matchRequests").doc(uid);
+    const profileName=userProfile.name||"Guest";
+    const myLocation=location?{lat:location.lat,lng:location.lng}:null;
+    try{
+      await leaveMatchQueue();
+      const waiting=await services.db.collection("matchRequests").where("status","==","waiting").limit(30).get();
+      const candidates=waiting.docs
+        .map(doc=>({id:doc.id,...doc.data()}))
+        .filter(item=>item.id!==uid&&item.language===language&&item.region===region)
+        .filter(item=>!myLocation||!item.location||matchMilesBetween(myLocation,item.location)<=50);
+      const candidate=candidates[0];
+      if(candidate){
+        const room=makeRoomId();
+        const callUrl=getCallUrl(room);
+        const matchId=`match-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
+        await services.db.runTransaction(async tx=>{
+          const candidateRef=services.db.collection("matchRequests").doc(candidate.id);
+          const candidateSnap=await tx.get(candidateRef);
+          if(!candidateSnap.exists||candidateSnap.data().status!=="waiting")throw new Error("That match was just taken. Searching again.");
+          const matchRef=services.db.collection("matches").doc(matchId);
+          const common={
+            matchId,
+            room,
+            callUrl,
+            language,
+            region,
+            status:"matched",
+            updatedAt:window.firebase.firestore.FieldValue.serverTimestamp()
+          };
+          tx.set(matchRef,{
+            id:matchId,
+            room,
+            callUrl,
+            language,
+            region,
+            status:"ready",
+            participants:[uid,candidate.id],
+            names:{[uid]:profileName,[candidate.id]:candidate.name||"Nearby match"},
+            createdAt:window.firebase.firestore.FieldValue.serverTimestamp()
+          });
+          tx.set(requestRef,{...common,uid,name:profileName,matchedName:candidate.name||"Nearby match"},{merge:true});
+          tx.set(candidateRef,{...common,matchedName:profileName},{merge:true});
+        });
+        handleMatchedRequest({room,callUrl,matchedName:candidate.name||"Nearby match"});
+        return true;
+      }
+      await requestRef.set({
+        uid,
+        name:profileName,
+        role:userProfile.role,
+        language,
+        region,
+        location:myLocation,
+        status:"waiting",
+        createdAt:window.firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt:window.firebase.firestore.FieldValue.serverTimestamp()
+      },{merge:true});
+      matchUnsubRef.current=requestRef.onSnapshot(doc=>{
+        const data=doc.data();
+        if(data?.status==="matched")handleMatchedRequest(data);
+      },err=>{
+        setMatchStatus("error");
+        setMatchError(err?.message||"Matching could not connect. Try again.");
+      });
+      setSafetyNotice("Searching nearby now. Keep this screen open while Charisma looks for someone close.");
+      setScreen("connecting");
+      return true;
+    }catch(err){
+      setMatchStatus("error");
+      setMatchError(err?.message||"Matching could not start. Try again.");
+      setScreen("connecting");
+      return false;
+    }
   };
 
   const saveDatePlan=(stayInCall=false)=>{
@@ -974,11 +1091,12 @@ function App(){
     setProfile(nextUnblockedProfile());
     setSentGifts([]);setShowGifts(false);setShowDatePlanner(false);
     setSelectedRest(null);setSelectedTime(null);setBookingDone(false);
-    setScreen("connecting");
+    await startNearbyMatch();
   };
 
   const goNext=async()=>{
     clearInterval(timerRef.current);clearInterval(blurRef.current);
+    await leaveMatchQueue();
     if(!await ensureCameraLive()){
       setScreen("home");
       return;
@@ -990,7 +1108,7 @@ function App(){
     setProfile(nextUnblockedProfile());
     setSentGifts([]);setFloating([]);setShowGifts(false);setShowDatePlanner(false);
     setSelectedRest(null);setSelectedTime(null);setBookingDone(false);
-    setScreen("connecting");
+    await startNearbyMatch();
   };
 
   const goKeep=()=>{
@@ -1005,6 +1123,7 @@ function App(){
 
   const goHome=()=>{
     clearInterval(timerRef.current);clearInterval(blurRef.current);
+    leaveMatchQueue();
     stopCamera();
     setScreen("home");
   };
@@ -1015,8 +1134,6 @@ function App(){
   const availableRegions=language?REGIONS_BY_LANGUAGE[language]:[];
   const setupComplete=Boolean(profileComplete&&language&&region&&locationStatus==="confirmed"&&cameraStatus==="live");
   const locationLabel=location?`${location.lat.toFixed(2)}, ${location.lng.toFixed(2)}`:"region only";
-  const betaInviteLink=betaRoom?getInviteLink(betaRoom):"";
-  const betaCallUrl=betaRoom?getCallUrl(betaRoom):"";
 
   return(
     <div style={{minHeight:"100vh",background:"rgba(18,13,16,0.72)",fontFamily:body,color:T.text,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:screen==="home"?"flex-start":"center",overflowX:"hidden",overflowY:screen==="home"?"auto":"hidden",position:"relative"}}>
@@ -1052,12 +1169,36 @@ function App(){
         </div>
       )}
 
-      {screen==="connecting"&&<CountdownRing onDone={()=>setScreen("call")}/>}
-
       <div style={{position:"relative",zIndex:1,width:"100%",maxWidth:400,padding:"0 20px"}}>
         {safetyNotice&&(
           <div className="glass" style={{padding:"11px 14px",marginBottom:12,fontFamily:body,fontStyle:"italic",fontSize:13,lineHeight:1.45,color:"rgba(245,236,230,0.82)",textAlign:"center",animation:"fadeUp 0.22s ease"}}>
             {safetyNotice}
+          </div>
+        )}
+
+        {screen==="connecting"&&(
+          <div className="glass" style={{padding:"28px 24px",textAlign:"center",animation:"fadeUp 0.45s ease"}}>
+            <div style={{width:92,height:92,borderRadius:"50%",margin:"0 auto 22px",border:"1px solid rgba(196,146,138,0.2)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 0 55px rgba(196,146,138,0.18)",position:"relative"}}>
+              <div style={{position:"absolute",inset:8,borderRadius:"50%",border:"1px solid rgba(122,181,201,0.3)",animation:"liveGlow 1.8s ease-in-out infinite"}}/>
+              <span style={{fontSize:28,color:T.rose}}>â§</span>
+            </div>
+            <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.24em",textTransform:"uppercase",color:"rgba(196,146,138,0.52)",marginBottom:10}}>
+              {matchStatus==="matched"?"Nearby match ready":matchStatus==="error"?"Matching paused":"Finding someone nearby"}
+            </p>
+            <h2 style={{fontFamily:serif,fontSize:34,fontWeight:300,lineHeight:1.05,color:T.cream,marginBottom:12}}>
+              {matchStatus==="matched"?`Matched with ${matchedProfileName}`:"Looking in your area"}
+            </h2>
+            <p style={{fontFamily:body,fontStyle:"italic",fontSize:14,lineHeight:1.65,color:T.muted,marginBottom:18}}>
+              {matchStatus==="error"?matchError:`${selectedLanguage?.name||"Your language"} Â· ${region||"your region"} Â· ${locationLabel}. Keep this open while another close match starts.`}
+            </p>
+            {matchCallUrl&&(
+              <button className="btn" onClick={openLiveMeet} style={{width:"100%",padding:"15px 0",borderRadius:14,fontSize:14,color:T.cream,letterSpacing:"0.08em",background:"linear-gradient(145deg,#c4928a,#a06870)",boxShadow:"0 8px 40px rgba(196,146,138,0.3)",marginBottom:10}}>
+                Enter live meet
+              </button>
+            )}
+            <button className="btn" onClick={goHome} style={{width:"100%",padding:"12px 0",borderRadius:13,fontSize:13,color:T.muted,background:"transparent",border:"1px solid rgba(196,146,138,0.12)",fontFamily:body,fontStyle:"italic"}}>
+              Cancel search
+            </button>
           </div>
         )}
 
@@ -1183,20 +1324,21 @@ function App(){
               </p>
             </div>
             <div className="glass" style={{padding:"16px 18px",marginBottom:22,textAlign:"left"}}>
-              <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.24em",color:"rgba(196,146,138,0.45)",textTransform:"uppercase",marginBottom:10}}>Private meet link</p>
-              <p style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted,lineHeight:1.5,marginBottom:12}}>Create a private room link and send it to one person. If both of you open the room, you join the same live video meet.</p>
-              {betaInviteLink&&(
-                <div style={{padding:"10px 12px",borderRadius:10,background:"rgba(18,13,16,0.45)",border:"1px solid rgba(196,146,138,0.1)",fontFamily:sans,fontSize:10,color:"rgba(245,236,230,0.72)",lineHeight:1.45,wordBreak:"break-all",marginBottom:10}}>{betaInviteLink}</div>
-              )}
-              <div style={{display:"grid",gridTemplateColumns:betaCallUrl?"1fr 1fr":"1fr",gap:8}}>
-                <button className="btn" onClick={createBetaInvite} style={{width:"100%",padding:"12px 10px",borderRadius:12,fontSize:12,color:T.cream,background:"rgba(122,181,201,0.14)",border:"1px solid rgba(122,181,201,0.35)",letterSpacing:"0.08em"}}>
-                  {betaRoom?(inviteCopied?"Copied meet link":"Copy meet link"):"Create meet link"}
-                </button>
-                {betaCallUrl&&(
-                  <button className="btn" onClick={()=>window.open(betaCallUrl,"_blank","noopener,noreferrer")} style={{width:"100%",padding:"12px 10px",borderRadius:12,fontSize:12,color:T.cream,background:"rgba(196,146,138,0.14)",border:"1px solid rgba(196,146,138,0.28)",letterSpacing:"0.08em"}}>
-                    Open live room
-                  </button>
-                )}
+              <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.24em",color:"rgba(196,146,138,0.45)",textTransform:"uppercase",marginBottom:10}}>Nearby matching</p>
+              <p style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted,lineHeight:1.5,marginBottom:12}}>When you begin, Charisma looks for another person close to your confirmed region and language. If someone is searching too, both of you enter the same live meet.</p>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+                <div style={{padding:"10px 8px",borderRadius:11,background:"rgba(122,181,201,0.08)",border:"1px solid rgba(122,181,201,0.18)",textAlign:"center"}}>
+                  <div style={{fontFamily:sans,fontSize:10,color:"rgba(223,247,247,0.75)",letterSpacing:"0.1em"}}>LANGUAGE</div>
+                  <div style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:T.muted,marginTop:3}}>{selectedLanguage?.name||"Choose"}</div>
+                </div>
+                <div style={{padding:"10px 8px",borderRadius:11,background:"rgba(196,146,138,0.08)",border:"1px solid rgba(196,146,138,0.16)",textAlign:"center"}}>
+                  <div style={{fontFamily:sans,fontSize:10,color:"rgba(245,236,230,0.68)",letterSpacing:"0.1em"}}>REGION</div>
+                  <div style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:T.muted,marginTop:3}}>{region||"Choose"}</div>
+                </div>
+                <div style={{padding:"10px 8px",borderRadius:11,background:"rgba(201,168,122,0.08)",border:"1px solid rgba(201,168,122,0.16)",textAlign:"center"}}>
+                  <div style={{fontFamily:sans,fontSize:10,color:"rgba(201,168,122,0.78)",letterSpacing:"0.1em"}}>RANGE</div>
+                  <div style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:T.muted,marginTop:3}}>Near you</div>
+                </div>
               </div>
             </div>
             <div className="glass" style={{padding:"16px 18px",marginBottom:22,textAlign:"left"}}>
@@ -1315,6 +1457,9 @@ function App(){
               <button className="btn" onClick={blockProfile} style={{padding:"10px 0",borderRadius:11,fontSize:11,color:T.muted,background:"rgba(196,146,138,0.06)",border:"1px solid rgba(196,146,138,0.12)",letterSpacing:"0.06em"}}>Block</button>
               <button className="btn" onClick={endCall} style={{padding:"10px 0",borderRadius:11,fontSize:11,color:"rgba(245,236,230,0.86)",background:"rgba(212,160,168,0.12)",border:"1px solid rgba(212,160,168,0.24)",letterSpacing:"0.06em"}}>End</button>
             </div>
+            {matchCallUrl&&(
+              <button className="btn" onClick={openLiveMeet} style={{width:"100%",padding:"12px 0",borderRadius:13,fontSize:13,color:T.cream,background:"rgba(122,181,201,0.14)",border:"1px solid rgba(122,181,201,0.35)",letterSpacing:"0.06em",marginBottom:8}}>Enter live meet</button>
+            )}
             {showDatePlanner&&(
               <div className="glass" style={{padding:16,marginBottom:8,animation:"fadeUp 0.22s ease"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginBottom:12}}>
@@ -1437,7 +1582,7 @@ function App(){
               </button>
             )}
             <div style={{display:"flex",gap:8,marginTop:11}}>
-              <button className="btn" onClick={createBetaInvite} style={{flex:1,padding:"13px 0",borderRadius:13,fontSize:13,color:T.cream,background:T.card,border:`1px solid ${T.border}`,letterSpacing:"0.04em"}}>{inviteCopied?"Meet link copied":"Copy meet link"}</button>
+              <button className="btn" onClick={()=>setShowDatePlanner(false)} style={{flex:1,padding:"13px 0",borderRadius:13,fontSize:13,color:T.cream,background:T.card,border:`1px solid ${T.border}`,letterSpacing:"0.04em"}}>Back to call</button>
               <button className="btn" onClick={goHome} style={{flex:1,padding:"13px 0",borderRadius:13,fontSize:13,color:T.muted,background:"transparent",border:"1px solid rgba(196,146,138,0.08)",fontFamily:body,fontStyle:"italic"}}>Back home</button>
             </div>
           </div>
@@ -1470,12 +1615,9 @@ function App(){
               <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.2em",color:"rgba(223,247,247,0.68)",textTransform:"uppercase",marginBottom:8}}>Safety reminder</p>
               <p style={{fontFamily:body,fontStyle:"italic",fontSize:13,lineHeight:1.5,color:T.muted}}>Meet in public, keep your exact address private, and share your plans with someone you trust.</p>
             </div>
-            {betaInviteLink&&(
-              <div style={{padding:"10px 12px",borderRadius:10,background:"rgba(18,13,16,0.45)",border:"1px solid rgba(196,146,138,0.1)",fontFamily:sans,fontSize:10,color:"rgba(245,236,230,0.72)",lineHeight:1.45,wordBreak:"break-all",marginBottom:12,textAlign:"left"}}>{betaInviteLink}</div>
-            )}
             <button className="btn" onClick={keepSearchingAfterBooking} style={{width:"100%",padding:"16px 0",borderRadius:13,fontSize:14,color:T.cream,background:"linear-gradient(145deg,#c4928a,#a06870)",boxShadow:"0 6px 32px rgba(196,146,138,0.25)",letterSpacing:"0.07em",marginBottom:10}}>Keep searching ❧</button>
-            {betaCallUrl&&(
-              <button className="btn" onClick={()=>window.open(betaCallUrl,"_blank","noopener,noreferrer")} style={{width:"100%",padding:"12px 0",borderRadius:13,fontSize:13,color:T.cream,background:T.card,border:`1px solid ${T.border}`,letterSpacing:"0.04em",marginBottom:10}}>Open live room</button>
+            {matchCallUrl&&(
+              <button className="btn" onClick={openLiveMeet} style={{width:"100%",padding:"12px 0",borderRadius:13,fontSize:13,color:T.cream,background:T.card,border:`1px solid ${T.border}`,letterSpacing:"0.04em",marginBottom:10}}>Enter live meet</button>
             )}
             <button className="btn" onClick={goHome} style={{width:"100%",padding:"12px 0",borderRadius:13,fontSize:13,color:T.muted,background:"transparent",border:"none",fontFamily:body,fontStyle:"italic"}}>Back home</button>
           </div>
