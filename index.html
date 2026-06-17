@@ -249,7 +249,8 @@ const REGIONS_BY_LANGUAGE={
 const FREE_REVEAL_LIMIT=4;
 const ACCESS_RESET_MS=24*60*60*1000;
 const DEFAULT_ACCESS={windowStart:Date.now(),callsUsed:0};
-const DEFAULT_PROFILE={name:"",age:"",city:"",role:"",intent:"Real dates",wallet:1200,isMember:false,giftsSent:[],giftsReceived:[]};
+const DEFAULT_PROFILE={name:"",age:"",city:"",role:"",intent:"Real dates",wallet:1200,isMember:false,email:"",hasAccount:false,giftsSent:[],giftsReceived:[]};
+const DEFAULT_ACCOUNT={email:"",password:""};
 const LIVE_SITE_URL="https://trycharisma.live/";
 const SUPPORT_EMAIL="support@trycharisma.live";
 const STRIPE_LINKS={
@@ -462,6 +463,12 @@ function App(){
     try{return {...DEFAULT_PROFILE,...JSON.parse(localStorage.getItem("charismaProfile")||"{}")};}
     catch(err){return DEFAULT_PROFILE;}
   });
+  const [accountDraft,setAccountDraft]=useState(()=>{
+    try{return {...DEFAULT_ACCOUNT,...JSON.parse(localStorage.getItem("charismaAccount")||"{}")};}
+    catch(err){return DEFAULT_ACCOUNT;}
+  });
+  const [showAccountSetup,setShowAccountSetup]=useState(false);
+  const [accountNotice,setAccountNotice]=useState("");
   const [revealAccess,setRevealAccess]=useState(()=>{
     try{
       const saved={...DEFAULT_ACCESS,...JSON.parse(localStorage.getItem("charismaRevealAccess")||"{}")};
@@ -557,7 +564,8 @@ function App(){
       setUserProfile(next);
       setProfileDraft(p=>({...p,isMember:true}));
       localStorage.setItem("charismaProfile",JSON.stringify(next));
-      setAccessNotice("Membership activated. Unlimited reveal calls are unlocked.");
+      setShowAccountSetup(true);
+      setAccessNotice("Membership activated. Create your Charisma account to keep up with gifts and Grace Points.");
     }else{
       const pack=GRACE_PACKS.find(p=>p.id===paid);
       if(pack){
@@ -580,6 +588,7 @@ function App(){
   const hasUnlimitedAccess=isWoman||isMember;
   const canStartReveal=hasUnlimitedAccess||freeCallsLeft>0;
   const profileComplete=Boolean(userProfile.name&&userProfile.age&&userProfile.city&&userProfile.role);
+  const memberNeedsAccount=Boolean(userProfile.isMember&&!userProfile.hasAccount);
 
   const saveProfile=()=>{
     const next={
@@ -595,6 +604,33 @@ function App(){
     setUserProfile(next);
     setCoins(next.wallet);
     localStorage.setItem("charismaProfile",JSON.stringify(next));
+  };
+
+  const hashPassword=async(password,email)=>{
+    const text=`charisma-beta:${email}:${password}`;
+    if(window.crypto?.subtle){
+      const bytes=await window.crypto.subtle.digest("SHA-256",new TextEncoder().encode(text));
+      return Array.from(new Uint8Array(bytes)).map(b=>b.toString(16).padStart(2,"0")).join("");
+    }
+    return btoa(text);
+  };
+
+  const saveMemberAccount=async()=>{
+    const email=String(accountDraft.email||"").trim().toLowerCase();
+    const password=String(accountDraft.password||"");
+    if(!email.includes("@")||password.length<6){
+      setAccountNotice("Use a real email and a password with at least 6 characters.");
+      return;
+    }
+    const betaAccount={email,passwordHash:await hashPassword(password,email),createdAt:new Date().toISOString()};
+    localStorage.setItem("charismaAccount",JSON.stringify(betaAccount));
+    const next={...userProfile,email,hasAccount:true,isMember:true};
+    setUserProfile(next);
+    setProfileDraft(p=>({...p,email,hasAccount:true,isMember:true}));
+    localStorage.setItem("charismaProfile",JSON.stringify(next));
+    setShowAccountSetup(false);
+    setAccountNotice("Account saved for this beta device.");
+    setAccessNotice("Membership account saved. Gifts and Grace Points will stay with this profile on this device.");
   };
 
   const openStripeCheckout=(kind)=>{
@@ -997,6 +1033,30 @@ function App(){
                 </div>
               ))}
             </div>
+            {(memberNeedsAccount||showAccountSetup||userProfile.hasAccount)&&(
+              <div className="glass" style={{padding:"18px 18px",marginBottom:22,textAlign:"left",border:userProfile.hasAccount?"1px solid rgba(154,220,190,0.22)":"1px solid rgba(201,168,122,0.22)"}}>
+                <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.24em",color:userProfile.hasAccount?"rgba(154,220,190,0.68)":"rgba(201,168,122,0.68)",textTransform:"uppercase",marginBottom:10}}>Membership account</p>
+                {userProfile.hasAccount?(
+                  <>
+                    <p style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted,lineHeight:1.5,marginBottom:12}}>Your beta account is connected to this profile for gifts and Grace Points.</p>
+                    <div style={{padding:"11px 12px",borderRadius:11,background:"rgba(154,220,190,0.08)",border:"1px solid rgba(154,220,190,0.16)",fontFamily:sans,fontSize:12,color:"rgba(223,247,247,0.82)",wordBreak:"break-all"}}>{userProfile.email||accountDraft.email}</div>
+                  </>
+                ):(
+                  <>
+                    <p style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted,lineHeight:1.5,marginBottom:12}}>Create your member login so your gifts, Grace Points, and unlimited access belong to one profile in the beta.</p>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr",gap:8,marginBottom:10}}>
+                      <input value={accountDraft.email} onChange={e=>setAccountDraft(p=>({...p,email:e.target.value}))} placeholder="Email" inputMode="email" autoComplete="email" style={{padding:"12px 12px",borderRadius:11,border:"1px solid rgba(196,146,138,0.14)",background:"rgba(18,13,16,0.42)",color:T.cream,fontFamily:sans,fontSize:13,outline:"none"}}/>
+                      <input value={accountDraft.password} onChange={e=>setAccountDraft(p=>({...p,password:e.target.value}))} placeholder="Password" type="password" autoComplete="new-password" style={{padding:"12px 12px",borderRadius:11,border:"1px solid rgba(196,146,138,0.14)",background:"rgba(18,13,16,0.42)",color:T.cream,fontFamily:sans,fontSize:13,outline:"none"}}/>
+                    </div>
+                    <button className="btn" onClick={saveMemberAccount} style={{width:"100%",padding:"12px 10px",borderRadius:12,fontSize:12,color:T.cream,background:"rgba(201,168,122,0.12)",border:"1px solid rgba(201,168,122,0.28)",letterSpacing:"0.08em"}}>Create member account</button>
+                    <p style={{fontFamily:body,fontStyle:"italic",fontSize:11,color:"rgba(154,136,128,0.58)",lineHeight:1.45,marginTop:9,textAlign:"center"}}>Beta note: this saves on this device until backend login is connected.</p>
+                  </>
+                )}
+                {accountNotice&&(
+                  <p style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:accountNotice.includes("saved")?"rgba(154,220,190,0.75)":"rgba(212,160,168,0.78)",lineHeight:1.45,marginTop:10,textAlign:"center"}}>{accountNotice}</p>
+                )}
+              </div>
+            )}
             <div className="glass" style={{padding:"18px 18px",marginBottom:22,textAlign:"left"}}>
               <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.24em",color:"rgba(196,146,138,0.45)",textTransform:"uppercase",marginBottom:12}}>Your profile</p>
               <div style={{display:"grid",gridTemplateColumns:"1fr 78px",gap:8,marginBottom:8}}>
