@@ -81,7 +81,7 @@ async function applyReward(uid, email, reward, session) {
   });
 }
 
-exports.stripeWebhook = onRequest({cors: false, secrets: [stripeSecretKey, stripeWebhookSecret]}, async (req, res) => {
+exports.stripeWebhook = onRequest({cors: false, invoker: "public", secrets: [stripeSecretKey, stripeWebhookSecret]}, async (req, res) => {
   if (req.method !== "POST") {
     res.status(405).send("Method Not Allowed");
     return;
