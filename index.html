@@ -292,15 +292,15 @@ const LEGAL_CONTENT={
   },
   privacy:{
     title:"Privacy",
-    body:["Charisma Private Beta stores profile, wallet, access, and date-plan information in your browser during this beta. Camera and location permissions are requested by your browser and are used to power preview, matching, and nearby date suggestions.","Payments are handled by Stripe. Charisma does not store your card number in this static beta."]
+    body:["Charisma stores profile, wallet, access, and date-plan information for your account experience. Camera and location permissions are requested by your browser and are used to power preview, matching, and nearby date suggestions.","Payments are handled by Stripe. Charisma does not store your card number."]
   },
   terms:{
     title:"Terms",
-    body:["By using Charisma Private Beta, you agree that you are at least 18 years old and that beta features may change while the product is being tested.","Grace Points and membership unlocks are beta functionality. Real production enforcement will require accounts, server-side storage, and Stripe webhook verification."]
+    body:["By using Charisma, you agree that you are at least 18 years old and that live features may change as the product improves.","Grace Points and membership unlocks are connected to your account. Payment verification is handled through Stripe and Firebase."]
   },
   support:{
     title:"Support",
-    body:[`For help, safety issues, payment questions, or beta feedback, contact ${SUPPORT_EMAIL}. Include the device, browser, and what happened so we can troubleshoot faster.`]
+    body:[`For help, safety issues, payment questions, or feedback, contact ${SUPPORT_EMAIL}. Include the device, browser, and what happened so we can troubleshoot faster.`]
   }
 };
 const BACKGROUND_VIDEOS=[
@@ -441,7 +441,7 @@ const CharismaFooter=({onStart,onLegal})=>{
           <div style={{width:38,height:38,borderRadius:"50%",background:"#060606",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:serif,fontSize:21}}>❧</div>
           <div>
             <h2 style={{fontSize:25,lineHeight:1.08,fontWeight:500,letterSpacing:"-0.03em",margin:0}}>Meet, Reveal, Plan</h2>
-            <p style={{fontSize:13,lineHeight:1.55,color:"rgba(6,6,6,0.58)",marginTop:7,maxWidth:330}}>A private beta flow for live chemistry, safer setup, and intentional first-date plans.</p>
+            <p style={{fontSize:13,lineHeight:1.55,color:"rgba(6,6,6,0.58)",marginTop:7,maxWidth:330}}>Private live rooms for chemistry, safer setup, and intentional first-date plans.</p>
           </div>
         </div>
         <div style={{display:"flex",flexWrap:"wrap",gap:10}}>
@@ -464,8 +464,8 @@ const CharismaFooter=({onStart,onLegal})=>{
         </div>
       </div>
       <div style={{marginTop:24,display:"flex",flexWrap:"wrap",gap:"4px 14px",fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.02em",color:"rgba(6,6,6,0.38)"}}>
-        <span>© Charisma Beta 2026</span>
-        <span>© Charisma Beta 2026</span>
+        <span>© Charisma 2026</span>
+        <span>© Charisma 2026</span>
       </div>
     </div>
   );
@@ -641,7 +641,7 @@ function App(){
   };
 
   const hashPassword=async(password,email)=>{
-    const text=`charisma-beta:${email}:${password}`;
+    const text=`charisma-live:${email}:${password}`;
     if(window.crypto?.subtle){
       const bytes=await window.crypto.subtle.digest("SHA-256",new TextEncoder().encode(text));
       return Array.from(new Uint8Array(bytes)).map(b=>b.toString(16).padStart(2,"0")).join("");
@@ -690,7 +690,7 @@ function App(){
     setProfileDraft(p=>({...p,email,hasAccount:true,isMember:true}));
     localStorage.setItem("charismaProfile",JSON.stringify(next));
     setShowAccountSetup(false);
-    setAccountNotice(services?"Firebase account created.":"Account saved for this beta device.");
+    setAccountNotice(services?"Firebase account created.":"Account saved for this device.");
     setAccessNotice(services?"Membership account created. Gifts and Grace Points are ready to sync with Firebase.":"Membership account saved. Gifts and Grace Points will stay with this profile on this device.");
   };
 
@@ -950,14 +950,14 @@ function App(){
     const report={profileId:profile.id,name:profile.name,at:new Date().toISOString()};
     const reports=JSON.parse(localStorage.getItem("charismaReports")||"[]");
     localStorage.setItem("charismaReports",JSON.stringify([report,...reports].slice(0,20)));
-    setSafetyNotice(`${profile.name} was reported. Our beta team will review this when backend moderation is connected.`);
+    setSafetyNotice(`${profile.name} was reported. Our safety team will review this when moderation is connected.`);
   };
 
   const blockProfile=()=>{
     const next=[...new Set([...blockedProfiles,profile.id])];
     setBlockedProfiles(next);
     localStorage.setItem("charismaBlockedProfiles",JSON.stringify(next));
-    setSafetyNotice(`${profile.name} was blocked and removed from your beta rotation.`);
+    setSafetyNotice(`${profile.name} was blocked and removed from your rotation.`);
     goNext();
   };
 
@@ -1099,18 +1099,18 @@ function App(){
                 <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.24em",color:userProfile.hasAccount?"rgba(154,220,190,0.68)":"rgba(201,168,122,0.68)",textTransform:"uppercase",marginBottom:10}}>Membership account</p>
                 {userProfile.hasAccount?(
                   <>
-                    <p style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted,lineHeight:1.5,marginBottom:12}}>{authProvider==="firebase"?"Your Firebase account is connected for cross-device login.":"Your beta account is connected to this profile for gifts and Grace Points on this device."}</p>
+                    <p style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted,lineHeight:1.5,marginBottom:12}}>{authProvider==="firebase"?"Your Firebase account is connected for cross-device login.":"Your account is connected to this profile for gifts and Grace Points on this device."}</p>
                     <div style={{padding:"11px 12px",borderRadius:11,background:"rgba(154,220,190,0.08)",border:"1px solid rgba(154,220,190,0.16)",fontFamily:sans,fontSize:12,color:"rgba(223,247,247,0.82)",wordBreak:"break-all"}}>{userProfile.email||accountDraft.email}</div>
                   </>
                 ):(
                   <>
-                    <p style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted,lineHeight:1.5,marginBottom:12}}>{authProvider==="firebase"?"Create your member login so gifts, Grace Points, and unlimited access can sync across devices.":"Create your member login so your gifts, Grace Points, and unlimited access belong to one profile in the beta."}</p>
+                    <p style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted,lineHeight:1.5,marginBottom:12}}>{authProvider==="firebase"?"Create your member login so gifts, Grace Points, and unlimited access can sync across devices.":"Create your member login so your gifts, Grace Points, and unlimited access belong to one profile."}</p>
                     <div style={{display:"grid",gridTemplateColumns:"1fr",gap:8,marginBottom:10}}>
                       <input value={accountDraft.email} onChange={e=>setAccountDraft(p=>({...p,email:e.target.value}))} placeholder="Email" inputMode="email" autoComplete="email" style={{padding:"12px 12px",borderRadius:11,border:"1px solid rgba(196,146,138,0.14)",background:"rgba(18,13,16,0.42)",color:T.cream,fontFamily:sans,fontSize:13,outline:"none"}}/>
                       <input value={accountDraft.password} onChange={e=>setAccountDraft(p=>({...p,password:e.target.value}))} placeholder="Password" type="password" autoComplete="new-password" style={{padding:"12px 12px",borderRadius:11,border:"1px solid rgba(196,146,138,0.14)",background:"rgba(18,13,16,0.42)",color:T.cream,fontFamily:sans,fontSize:13,outline:"none"}}/>
                     </div>
                     <button className="btn" onClick={saveMemberAccount} style={{width:"100%",padding:"12px 10px",borderRadius:12,fontSize:12,color:T.cream,background:"rgba(201,168,122,0.12)",border:"1px solid rgba(201,168,122,0.28)",letterSpacing:"0.08em"}}>Create member account</button>
-                    <p style={{fontFamily:body,fontStyle:"italic",fontSize:11,color:"rgba(154,136,128,0.58)",lineHeight:1.45,marginTop:9,textAlign:"center"}}>{authProvider==="firebase"?"Firebase auth is connected. Stripe webhooks are next for payment verification.":"Beta note: this saves on this device until Firebase config is added."}</p>
+                    <p style={{fontFamily:body,fontStyle:"italic",fontSize:11,color:"rgba(154,136,128,0.58)",lineHeight:1.45,marginTop:9,textAlign:"center"}}>{authProvider==="firebase"?"Firebase auth is connected. Stripe webhooks verify payments.":"This saves on this device until Firebase config is added."}</p>
                   </>
                 )}
                 {accountNotice&&(
@@ -1172,7 +1172,7 @@ function App(){
               </p>
               {locationStatus==="error"&&(
                 <button className="btn" onClick={confirmRegionOnly} disabled={!language||!region} style={{width:"100%",padding:"11px 10px",borderRadius:12,fontSize:11,color:T.cream,background:"rgba(196,146,138,0.08)",border:"1px solid rgba(196,146,138,0.18)",letterSpacing:"0.06em",marginTop:8}}>
-                  Use selected region for beta
+                  Use selected region
                 </button>
               )}
               <button className="btn" onClick={startCamera} disabled={locationStatus!=="confirmed"||cameraStatus==="requesting"||cameraStatus==="live"} style={{width:"100%",padding:"13px 10px",borderRadius:12,fontSize:12,color:cameraStatus==="live"?"#dff7f7":T.cream,background:cameraStatus==="live"?"rgba(122,181,201,0.16)":"rgba(196,146,138,0.12)",border:cameraStatus==="live"?"1px solid rgba(122,181,201,0.45)":"1px solid rgba(196,146,138,0.18)",letterSpacing:"0.08em",opacity:locationStatus==="confirmed"?1:0.45,marginTop:10}}>
@@ -1183,17 +1183,24 @@ function App(){
               </p>
             </div>
             <div className="glass" style={{padding:"16px 18px",marginBottom:22,textAlign:"left"}}>
-              <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.24em",color:"rgba(196,146,138,0.45)",textTransform:"uppercase",marginBottom:10}}>Private beta invite</p>
-              <p style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted,lineHeight:1.5,marginBottom:12}}>Create a room link and send it to one person. If both of you open the same link, you join the same live video room.</p>
+              <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.24em",color:"rgba(196,146,138,0.45)",textTransform:"uppercase",marginBottom:10}}>Private meet link</p>
+              <p style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted,lineHeight:1.5,marginBottom:12}}>Create a private room link and send it to one person. If both of you open the room, you join the same live video meet.</p>
               {betaInviteLink&&(
                 <div style={{padding:"10px 12px",borderRadius:10,background:"rgba(18,13,16,0.45)",border:"1px solid rgba(196,146,138,0.1)",fontFamily:sans,fontSize:10,color:"rgba(245,236,230,0.72)",lineHeight:1.45,wordBreak:"break-all",marginBottom:10}}>{betaInviteLink}</div>
               )}
-              <button className="btn" onClick={createBetaInvite} style={{width:"100%",padding:"12px 10px",borderRadius:12,fontSize:12,color:T.cream,background:"rgba(122,181,201,0.14)",border:"1px solid rgba(122,181,201,0.35)",letterSpacing:"0.08em"}}>
-                {betaRoom?(inviteCopied?"Copied invite link":"Copy beta invite link"):"Create beta invite link"}
-              </button>
+              <div style={{display:"grid",gridTemplateColumns:betaCallUrl?"1fr 1fr":"1fr",gap:8}}>
+                <button className="btn" onClick={createBetaInvite} style={{width:"100%",padding:"12px 10px",borderRadius:12,fontSize:12,color:T.cream,background:"rgba(122,181,201,0.14)",border:"1px solid rgba(122,181,201,0.35)",letterSpacing:"0.08em"}}>
+                  {betaRoom?(inviteCopied?"Copied meet link":"Copy meet link"):"Create meet link"}
+                </button>
+                {betaCallUrl&&(
+                  <button className="btn" onClick={()=>window.open(betaCallUrl,"_blank","noopener,noreferrer")} style={{width:"100%",padding:"12px 10px",borderRadius:12,fontSize:12,color:T.cream,background:"rgba(196,146,138,0.14)",border:"1px solid rgba(196,146,138,0.28)",letterSpacing:"0.08em"}}>
+                    Open live room
+                  </button>
+                )}
+              </div>
             </div>
             <div className="glass" style={{padding:"16px 18px",marginBottom:22,textAlign:"left"}}>
-              <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.24em",color:"rgba(196,146,138,0.45)",textTransform:"uppercase",marginBottom:10}}>Beta safety</p>
+              <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.24em",color:"rgba(196,146,138,0.45)",textTransform:"uppercase",marginBottom:10}}>Safety</p>
               <p style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted,lineHeight:1.55,marginBottom:12}}>18+ only. Meet in public, keep your exact address private, and use report/block if a match feels off.</p>
               <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7}}>
                 {[["Safety","safety"],["Privacy","privacy"],["Terms","terms"],["Support","support"]].map(([label,key])=>(
@@ -1430,7 +1437,7 @@ function App(){
               </button>
             )}
             <div style={{display:"flex",gap:8,marginTop:11}}>
-              <button className="btn" onClick={createBetaInvite} style={{flex:1,padding:"13px 0",borderRadius:13,fontSize:13,color:T.cream,background:T.card,border:`1px solid ${T.border}`,letterSpacing:"0.04em"}}>{inviteCopied?"Invite copied":"Copy invite"}</button>
+              <button className="btn" onClick={createBetaInvite} style={{flex:1,padding:"13px 0",borderRadius:13,fontSize:13,color:T.cream,background:T.card,border:`1px solid ${T.border}`,letterSpacing:"0.04em"}}>{inviteCopied?"Meet link copied":"Copy meet link"}</button>
               <button className="btn" onClick={goHome} style={{flex:1,padding:"13px 0",borderRadius:13,fontSize:13,color:T.muted,background:"transparent",border:"1px solid rgba(196,146,138,0.08)",fontFamily:body,fontStyle:"italic"}}>Back home</button>
             </div>
           </div>
@@ -1468,7 +1475,7 @@ function App(){
             )}
             <button className="btn" onClick={keepSearchingAfterBooking} style={{width:"100%",padding:"16px 0",borderRadius:13,fontSize:14,color:T.cream,background:"linear-gradient(145deg,#c4928a,#a06870)",boxShadow:"0 6px 32px rgba(196,146,138,0.25)",letterSpacing:"0.07em",marginBottom:10}}>Keep searching ❧</button>
             {betaCallUrl&&(
-              <button className="btn" onClick={()=>window.open(betaCallUrl,"_blank","noopener,noreferrer")} style={{width:"100%",padding:"12px 0",borderRadius:13,fontSize:13,color:T.cream,background:T.card,border:`1px solid ${T.border}`,letterSpacing:"0.04em",marginBottom:10}}>Open invite room</button>
+              <button className="btn" onClick={()=>window.open(betaCallUrl,"_blank","noopener,noreferrer")} style={{width:"100%",padding:"12px 0",borderRadius:13,fontSize:13,color:T.cream,background:T.card,border:`1px solid ${T.border}`,letterSpacing:"0.04em",marginBottom:10}}>Open live room</button>
             )}
             <button className="btn" onClick={goHome} style={{width:"100%",padding:"12px 0",borderRadius:13,fontSize:13,color:T.muted,background:"transparent",border:"none",fontFamily:body,fontStyle:"italic"}}>Back home</button>
           </div>
