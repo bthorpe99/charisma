@@ -10,7 +10,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=swap');
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -260,13 +262,22 @@ const STRIPE_LINKS={
   grace1200:"https://buy.stripe.com/aFa8wQ2OS3eygN28FX7N602",
   grace3000:"https://buy.stripe.com/fZu4gAexAdTcbsI6xP7N603"
 };
-const SUPABASE_URL="";
-const SUPABASE_ANON_KEY="";
-let supabaseClient=null;
-const getSupabaseClient=()=>{
-  if(!SUPABASE_URL||!SUPABASE_ANON_KEY||!window.supabase?.createClient)return null;
-  if(!supabaseClient)supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{auth:{persistSession:true,autoRefreshToken:true}});
-  return supabaseClient;
+const FIREBASE_CONFIG={
+  apiKey:"",
+  authDomain:"",
+  projectId:"",
+  storageBucket:"",
+  messagingSenderId:"",
+  appId:""
+};
+let firebaseServices=null;
+const getFirebaseServices=()=>{
+  if(!FIREBASE_CONFIG.apiKey||!window.firebase?.initializeApp)return null;
+  if(!firebaseServices){
+    const app=window.firebase.apps?.length?window.firebase.app():window.firebase.initializeApp(FIREBASE_CONFIG);
+    firebaseServices={app,auth:window.firebase.auth(),db:window.firebase.firestore()};
+  }
+  return firebaseServices;
 };
 const GRACE_PACKS=[
   {id:"grace500",label:"500 Grace Points",points:500,price:"$4.99"},
@@ -478,7 +489,7 @@ function App(){
   });
   const [showAccountSetup,setShowAccountSetup]=useState(false);
   const [accountNotice,setAccountNotice]=useState("");
-  const [authProvider,setAuthProvider]=useState(()=>getSupabaseClient()?"supabase":"local");
+  const [authProvider,setAuthProvider]=useState(()=>getFirebaseServices()?"firebase":"local");
   const [revealAccess,setRevealAccess]=useState(()=>{
     try{
       const saved={...DEFAULT_ACCESS,...JSON.parse(localStorage.getItem("charismaRevealAccess")||"{}")};
@@ -566,15 +577,15 @@ function App(){
   },[userProfile,coins]);
 
   useEffect(()=>{
-    const client=getSupabaseClient();
-    if(!client)return;
-    setAuthProvider("supabase");
-    client.auth.getUser().then(({data})=>{
-      const authUser=data?.user;
+    const services=getFirebaseServices();
+    if(!services)return;
+    setAuthProvider("firebase");
+    const unsubscribe=services.auth.onAuthStateChanged(authUser=>{
       if(!authUser?.email)return;
       setUserProfile(p=>({...p,email:authUser.email,hasAccount:true}));
       setProfileDraft(p=>({...p,email:authUser.email,hasAccount:true}));
-    }).catch(()=>{});
+    });
+    return()=>unsubscribe?.();
   },[]);
 
   useEffect(()=>{
@@ -645,29 +656,32 @@ function App(){
       return;
     }
     setAccountNotice("Creating your account...");
-    const client=getSupabaseClient();
+    const services=getFirebaseServices();
     let betaAccount={email,passwordHash:await hashPassword(password,email),createdAt:new Date().toISOString(),provider:"local"};
-    if(client){
-      const {data,error}=await client.auth.signUp({
-        email,
-        password,
-        options:{
-          data:{
-            display_name:userProfile.name||profileDraft.name||"",
-            city:userProfile.city||profileDraft.city||"",
-            role:userProfile.role||profileDraft.role||"",
-            intent:userProfile.intent||profileDraft.intent||"Real dates",
-            wallet:coins,
-            is_member:true
-          }
-        }
-      });
-      if(error){
-        setAccountNotice(error.message||"Supabase account setup failed. Try again.");
+    if(services){
+      try{
+        const credential=await services.auth.createUserWithEmailAndPassword(email,password);
+        const authUser=credential.user;
+        await authUser.updateProfile({displayName:userProfile.name||profileDraft.name||"Charisma member"});
+        await services.db.collection("members").doc(authUser.uid).set({
+          email,
+          displayName:userProfile.name||profileDraft.name||"",
+          city:userProfile.city||profileDraft.city||"",
+          role:userProfile.role||profileDraft.role||"",
+          intent:userProfile.intent||profileDraft.intent||"Real dates",
+          wallet:coins,
+          isMember:true,
+          giftsSent:userProfile.giftsSent||[],
+          giftsReceived:userProfile.giftsReceived||[],
+          updatedAt:window.firebase.firestore.FieldValue.serverTimestamp(),
+          createdAt:window.firebase.firestore.FieldValue.serverTimestamp()
+        },{merge:true});
+        betaAccount={email,firebaseUid:authUser.uid,createdAt:new Date().toISOString(),provider:"firebase"};
+        setAuthProvider("firebase");
+      }catch(error){
+        setAccountNotice(error.message||"Firebase account setup failed. Try again.");
         return;
       }
-      betaAccount={email,supabaseUserId:data?.user?.id||"",createdAt:new Date().toISOString(),provider:"supabase"};
-      setAuthProvider("supabase");
     }
     localStorage.setItem("charismaAccount",JSON.stringify(betaAccount));
     const next={...userProfile,email,hasAccount:true,isMember:true};
@@ -675,8 +689,8 @@ function App(){
     setProfileDraft(p=>({...p,email,hasAccount:true,isMember:true}));
     localStorage.setItem("charismaProfile",JSON.stringify(next));
     setShowAccountSetup(false);
-    setAccountNotice(client?"Real account created. Check email if confirmation is requested.":"Account saved for this beta device.");
-    setAccessNotice(client?"Membership account created. Gifts and Grace Points are ready to sync with the backend.":"Membership account saved. Gifts and Grace Points will stay with this profile on this device.");
+    setAccountNotice(services?"Firebase account created.":"Account saved for this beta device.");
+    setAccessNotice(services?"Membership account created. Gifts and Grace Points are ready to sync with Firebase.":"Membership account saved. Gifts and Grace Points will stay with this profile on this device.");
   };
 
   const openStripeCheckout=(kind)=>{
@@ -1084,18 +1098,18 @@ function App(){
                 <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.24em",color:userProfile.hasAccount?"rgba(154,220,190,0.68)":"rgba(201,168,122,0.68)",textTransform:"uppercase",marginBottom:10}}>Membership account</p>
                 {userProfile.hasAccount?(
                   <>
-                    <p style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted,lineHeight:1.5,marginBottom:12}}>{authProvider==="supabase"?"Your real account is connected for cross-device login.":"Your beta account is connected to this profile for gifts and Grace Points on this device."}</p>
+                    <p style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted,lineHeight:1.5,marginBottom:12}}>{authProvider==="firebase"?"Your Firebase account is connected for cross-device login.":"Your beta account is connected to this profile for gifts and Grace Points on this device."}</p>
                     <div style={{padding:"11px 12px",borderRadius:11,background:"rgba(154,220,190,0.08)",border:"1px solid rgba(154,220,190,0.16)",fontFamily:sans,fontSize:12,color:"rgba(223,247,247,0.82)",wordBreak:"break-all"}}>{userProfile.email||accountDraft.email}</div>
                   </>
                 ):(
                   <>
-                    <p style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted,lineHeight:1.5,marginBottom:12}}>{authProvider==="supabase"?"Create your member login so gifts, Grace Points, and unlimited access can sync across devices.":"Create your member login so your gifts, Grace Points, and unlimited access belong to one profile in the beta."}</p>
+                    <p style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted,lineHeight:1.5,marginBottom:12}}>{authProvider==="firebase"?"Create your member login so gifts, Grace Points, and unlimited access can sync across devices.":"Create your member login so your gifts, Grace Points, and unlimited access belong to one profile in the beta."}</p>
                     <div style={{display:"grid",gridTemplateColumns:"1fr",gap:8,marginBottom:10}}>
                       <input value={accountDraft.email} onChange={e=>setAccountDraft(p=>({...p,email:e.target.value}))} placeholder="Email" inputMode="email" autoComplete="email" style={{padding:"12px 12px",borderRadius:11,border:"1px solid rgba(196,146,138,0.14)",background:"rgba(18,13,16,0.42)",color:T.cream,fontFamily:sans,fontSize:13,outline:"none"}}/>
                       <input value={accountDraft.password} onChange={e=>setAccountDraft(p=>({...p,password:e.target.value}))} placeholder="Password" type="password" autoComplete="new-password" style={{padding:"12px 12px",borderRadius:11,border:"1px solid rgba(196,146,138,0.14)",background:"rgba(18,13,16,0.42)",color:T.cream,fontFamily:sans,fontSize:13,outline:"none"}}/>
                     </div>
                     <button className="btn" onClick={saveMemberAccount} style={{width:"100%",padding:"12px 10px",borderRadius:12,fontSize:12,color:T.cream,background:"rgba(201,168,122,0.12)",border:"1px solid rgba(201,168,122,0.28)",letterSpacing:"0.08em"}}>Create member account</button>
-                    <p style={{fontFamily:body,fontStyle:"italic",fontSize:11,color:"rgba(154,136,128,0.58)",lineHeight:1.45,marginTop:9,textAlign:"center"}}>{authProvider==="supabase"?"Backend auth is connected. Stripe webhooks are next for payment verification.":"Beta note: this saves on this device until Supabase keys are added."}</p>
+                    <p style={{fontFamily:body,fontStyle:"italic",fontSize:11,color:"rgba(154,136,128,0.58)",lineHeight:1.45,marginTop:9,textAlign:"center"}}>{authProvider==="firebase"?"Firebase auth is connected. Stripe webhooks are next for payment verification.":"Beta note: this saves on this device until Firebase config is added."}</p>
                   </>
                 )}
                 {accountNotice&&(
