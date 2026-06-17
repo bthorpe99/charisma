@@ -1180,7 +1180,7 @@ function App(){
           <div className="glass" style={{padding:"28px 24px",textAlign:"center",animation:"fadeUp 0.45s ease"}}>
             <div style={{width:92,height:92,borderRadius:"50%",margin:"0 auto 22px",border:"1px solid rgba(196,146,138,0.2)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 0 55px rgba(196,146,138,0.18)",position:"relative"}}>
               <div style={{position:"absolute",inset:8,borderRadius:"50%",border:"1px solid rgba(122,181,201,0.3)",animation:"liveGlow 1.8s ease-in-out infinite"}}/>
-              <span style={{fontSize:28,color:T.rose}}>â§</span>
+              <span style={{fontFamily:sans,fontSize:18,fontWeight:600,letterSpacing:"0.18em",color:T.rose}}>LIVE</span>
             </div>
             <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.24em",textTransform:"uppercase",color:"rgba(196,146,138,0.52)",marginBottom:10}}>
               {matchStatus==="matched"?"Nearby match ready":matchStatus==="error"?"Matching paused":"Finding someone nearby"}
@@ -1189,7 +1189,7 @@ function App(){
               {matchStatus==="matched"?`Matched with ${matchedProfileName}`:"Looking in your area"}
             </h2>
             <p style={{fontFamily:body,fontStyle:"italic",fontSize:14,lineHeight:1.65,color:T.muted,marginBottom:18}}>
-              {matchStatus==="error"?matchError:`${selectedLanguage?.name||"Your language"} Â· ${region||"your region"} Â· ${locationLabel}. Keep this open while another close match starts.`}
+              {matchStatus==="error"?matchError:`${selectedLanguage?.name||"Your language"} - ${region||"your region"} - ${locationLabel}. Keep this open while another close match starts.`}
             </p>
             {matchCallUrl&&(
               <button className="btn" onClick={openLiveMeet} style={{width:"100%",padding:"15px 0",borderRadius:14,fontSize:14,color:T.cream,letterSpacing:"0.08em",background:"linear-gradient(145deg,#c4928a,#a06870)",boxShadow:"0 8px 40px rgba(196,146,138,0.3)",marginBottom:10}}>
