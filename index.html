@@ -866,7 +866,19 @@ function App(){
 
   const makeRoomId=()=>`charisma-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
 
-  const getCallUrl=room=>`https://meet.jit.si/${encodeURIComponent(room)}#config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false&interfaceConfig.SHOW_JITSI_WATERMARK=false`;
+  // ── Daily.co video config ──
+  const DAILY_DOMAIN="trycharisma.daily.co";
+  const DAILY_ROOM_WORKER="https://charisma-rooms.bthorpe99.workers.dev";
+  const buildJitsiUrl=room=>`https://meet.jit.si/${encodeURIComponent(room)}#config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false&interfaceConfig.SHOW_JITSI_WATERMARK=false`;
+  const createDailyRoom=async room=>{
+    if(!DAILY_ROOM_WORKER||DAILY_ROOM_WORKER.indexOf("PASTE_YOUR_WORKER")===0){return buildJitsiUrl(room);}
+    try{
+      const res=await fetch(DAILY_ROOM_WORKER,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({room})});
+      if(!res.ok)throw new Error("room create failed");
+      const data=await res.json();
+      return data.url||`https://${DAILY_DOMAIN}/${encodeURIComponent(room)}`;
+    }catch(err){return buildJitsiUrl(room);}
+  };
 
   const toMatchRad=n=>n*Math.PI/180;
   const matchMilesBetween=(a,b)=>{
@@ -908,7 +920,7 @@ function App(){
 
   const handleMatchedRequest=data=>{
     const room=data.room||makeRoomId();
-    const callUrl=data.callUrl||getCallUrl(room);
+    const callUrl=data.callUrl||buildJitsiUrl(room);
     setMatchRoom(room);
     setMatchCallUrl(callUrl);
     setMatchedProfileName(data.matchedName||"someone nearby");
@@ -945,7 +957,7 @@ function App(){
       const candidate=candidates[0];
       if(candidate){
         const room=makeRoomId();
-        const callUrl=getCallUrl(room);
+        const callUrl=await createDailyRoom(room);
         const matchId=`match-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
         await services.db.runTransaction(async tx=>{
           const candidateRef=services.db.collection("matchRequests").doc(candidate.id);
