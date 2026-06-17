@@ -269,6 +269,7 @@ const INTEREST_OPTIONS=[
   "Nonbinary people",
   "Trans women",
   "Trans men",
+  "Gender-fluid people",
   "Queer people",
   "Open to all"
 ];
@@ -282,7 +283,7 @@ const ORIENTATION_OPTIONS=[
   "Questioning",
   "Prefer to say later"
 ];
-const DEFAULT_PROFILE={name:"",age:"",city:"",role:"",identity:"",interestedIn:["Open to all"],orientation:"",intent:"Real dates",wallet:1200,isMember:false,email:"",hasAccount:false,giftsSent:[],giftsReceived:[]};
+const DEFAULT_PROFILE={name:"",age:"",city:"",role:"",identity:"",interestedIn:[],orientation:"",intent:"Real dates",wallet:1200,isMember:false,email:"",hasAccount:false,giftsSent:[],giftsReceived:[]};
 const DEFAULT_ACCOUNT={email:"",password:""};
 const LIVE_SITE_URL="https://trycharisma.live/";
 const SUPPORT_EMAIL="support@trycharisma.live";
@@ -762,18 +763,33 @@ function App(){
   const freeCallsLeft=Math.max(0,FREE_REVEAL_LIMIT-activeAccess.callsUsed);
   const hasUnlimitedAccess=isWoman||isMember;
   const canStartReveal=hasUnlimitedAccess||freeCallsLeft>0;
-  const profileComplete=Boolean(userProfile.name&&userProfile.age&&userProfile.city&&userProfile.role);
+  const profileComplete=Boolean(userProfile.name&&userProfile.age&&userProfile.city&&userProfile.role&&userProfile.identity&&Array.isArray(userProfile.interestedIn)&&userProfile.interestedIn.length);
   const memberNeedsAccount=Boolean(userProfile.isMember&&!userProfile.hasAccount);
-  const normalizeInterestLabel=value=>{
-    if(value==="Open to all")return "Open to all";
-    return String(value||"").replace(/\s+people$/i,"").replace(/s$/,"");
-  };
+  const identityKey=value=>({
+    "Woman":"woman",
+    "Man":"man",
+    "Nonbinary":"nonbinary",
+    "Trans woman":"trans woman",
+    "Trans man":"trans man",
+    "Gender-fluid":"gender-fluid",
+    "Queer":"queer"
+  }[value]||"");
+  const interestKey=value=>({
+    "Women":"woman",
+    "Men":"man",
+    "Nonbinary people":"nonbinary",
+    "Trans women":"trans woman",
+    "Trans men":"trans man",
+    "Gender-fluid people":"gender-fluid",
+    "Queer people":"queer",
+    "Open to all":"all"
+  }[value]||"");
   const profileWantsCandidate=(viewer,candidate)=>{
     const wants=Array.isArray(viewer?.interestedIn)?viewer.interestedIn:[];
-    if(!wants.length||wants.includes("Open to all"))return true;
-    const candidateIdentity=candidate?.identity||candidate?.role||"";
-    if(!candidateIdentity)return true;
-    return wants.some(item=>normalizeInterestLabel(item).toLowerCase()===candidateIdentity.toLowerCase());
+    const candidateIdentity=identityKey(candidate?.identity||candidate?.role||"");
+    if(!wants.length||!candidateIdentity)return false;
+    if(wants.includes("Open to all"))return true;
+    return wants.some(item=>interestKey(item)===candidateIdentity);
   };
   const toggleInterest=interest=>{
     setProfileDraft(p=>{
@@ -781,7 +797,7 @@ function App(){
       if(interest==="Open to all")return {...p,interestedIn:["Open to all"]};
       const withoutOpen=current.filter(item=>item!=="Open to all");
       const next=withoutOpen.includes(interest)?withoutOpen.filter(item=>item!==interest):[...withoutOpen,interest];
-      return {...p,interestedIn:next.length?next:["Open to all"]};
+      return {...p,interestedIn:next};
     });
   };
 
@@ -793,7 +809,7 @@ function App(){
       city:String(profileDraft.city||"").trim(),
       role:profileDraft.role||"",
       identity:profileDraft.identity||profileDraft.role||"",
-      interestedIn:Array.isArray(profileDraft.interestedIn)&&profileDraft.interestedIn.length?profileDraft.interestedIn:["Open to all"],
+      interestedIn:Array.isArray(profileDraft.interestedIn)?profileDraft.interestedIn:[],
       orientation:profileDraft.orientation||"",
       intent:profileDraft.intent||"Real dates",
       isMember:Boolean(profileDraft.isMember),
@@ -834,7 +850,7 @@ function App(){
           city:userProfile.city||profileDraft.city||"",
           role:userProfile.role||profileDraft.role||"",
           identity:userProfile.identity||profileDraft.identity||userProfile.role||profileDraft.role||"",
-          interestedIn:userProfile.interestedIn||profileDraft.interestedIn||["Open to all"],
+          interestedIn:userProfile.interestedIn||profileDraft.interestedIn||[],
           orientation:userProfile.orientation||profileDraft.orientation||"",
           intent:userProfile.intent||profileDraft.intent||"Real dates",
           wallet:coins,
@@ -1157,7 +1173,7 @@ function App(){
         name:profileName,
         role:userProfile.role,
         identity:userProfile.identity||userProfile.role||"",
-        interestedIn:userProfile.interestedIn||["Open to all"],
+        interestedIn:userProfile.interestedIn||[],
         orientation:userProfile.orientation||"",
         intent:userProfile.intent||"Real dates",
         language,
@@ -1477,7 +1493,7 @@ function App(){
                 <div style={{padding:"10px 12px",borderRadius:12,background:"rgba(201,168,122,0.1)",border:"1px solid rgba(201,168,122,0.18)",fontFamily:sans,fontSize:12,color:T.gold,whiteSpace:"nowrap"}}>❧ {coins.toLocaleString()}</div>
               </div>
               <p style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:profileComplete?"rgba(154,220,190,0.75)":"rgba(154,136,128,0.58)",lineHeight:1.45,marginTop:10,textAlign:"center"}}>
-                {profileComplete?`${userProfile.name}, ${userProfile.age} · ${userProfile.city} · ${userProfile.identity||userProfile.role} · wants ${(userProfile.interestedIn||["Open to all"]).join(", ")} · ${userProfile.intent}`:"Save a profile so gifts and Grace Points belong to someone."}
+                {profileComplete?`${userProfile.name}, ${userProfile.age} · ${userProfile.city} · ${userProfile.identity||userProfile.role} · wants ${(userProfile.interestedIn||[]).join(", ")} · ${userProfile.intent}`:"Save a profile with identity and preferences so gifts, Grace Points, and matching belong to the right person."}
               </p>
             </div>
             <div className="glass" style={{padding:"18px 18px",marginBottom:22,textAlign:"left"}}>
