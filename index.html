@@ -13,6 +13,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+<script src="https://unpkg.com/@daily-co/daily-js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=swap');
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -395,6 +396,111 @@ const TimeSlots=({times,selected,onSelect})=>(
     ))}
   </div>
 );
+
+const trackFromParticipant=(participant,kind)=>{
+  if(!participant)return null;
+  return participant.tracks?.[kind]?.persistentTrack||participant.tracks?.[kind]?.track||participant[`${kind}Track`]||null;
+};
+
+const DailyLiveRoom=({url,name,matchedName,blurAmount,activeQuestion,activeQuestionIndex})=>{
+  const callRef=useRef(null);
+  const mainVideoRef=useRef(null);
+  const localVideoRef=useRef(null);
+  const audioRef=useRef(null);
+  const [participants,setParticipants]=useState({});
+  const [status,setStatus]=useState("joining");
+
+  useEffect(()=>{
+    if(!url||!window.DailyIframe)return;
+    let active=true;
+    const call=window.DailyIframe.createCallObject({subscribeToTracksAutomatically:true});
+    callRef.current=call;
+    const update=()=>{if(active)setParticipants({...call.participants()});};
+    call
+      .on("joined-meeting",()=>{setStatus("joined");update();})
+      .on("participant-joined",update)
+      .on("participant-updated",update)
+      .on("participant-left",update)
+      .on("track-started",update)
+      .on("track-stopped",update)
+      .on("error",()=>setStatus("error"))
+      .on("left-meeting",()=>setStatus("left"));
+    call.join({url,userName:name||"Guest"}).catch(()=>setStatus("error"));
+    return()=>{
+      active=false;
+      call.leave().catch(()=>{}).finally(()=>call.destroy().catch(()=>{}));
+      callRef.current=null;
+    };
+  },[url,name]);
+
+  const allParticipants=Object.values(participants);
+  const localParticipant=allParticipants.find(p=>p.local);
+  const remoteParticipant=allParticipants.find(p=>!p.local&&trackFromParticipant(p,"video"));
+  const featuredParticipant=remoteParticipant||localParticipant;
+
+  useEffect(()=>{
+    const videoTrack=trackFromParticipant(featuredParticipant,"video");
+    if(mainVideoRef.current&&videoTrack){
+      mainVideoRef.current.srcObject=new MediaStream([videoTrack]);
+      mainVideoRef.current.play?.().catch(()=>{});
+    }
+    const audioTrack=trackFromParticipant(remoteParticipant,"audio");
+    if(audioRef.current&&audioTrack){
+      audioRef.current.srcObject=new MediaStream([audioTrack]);
+      audioRef.current.play?.().catch(()=>{});
+    }
+  },[participants,featuredParticipant?.session_id,remoteParticipant?.session_id]);
+
+  useEffect(()=>{
+    const localTrack=trackFromParticipant(localParticipant,"video");
+    if(localVideoRef.current&&localTrack){
+      localVideoRef.current.srcObject=new MediaStream([localTrack]);
+      localVideoRef.current.play?.().catch(()=>{});
+    }
+  },[participants,localParticipant?.session_id]);
+
+  return(
+    <>
+      <video ref={mainVideoRef} autoPlay playsInline muted={!remoteParticipant} style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",background:"#080608",filter:`blur(${blurAmount*0.32}px)`,transition:"filter 1.4s ease",zIndex:1}}/>
+      <audio ref={audioRef} autoPlay playsInline/>
+      {!featuredParticipant&&(
+        <div style={{position:"absolute",inset:0,zIndex:1,display:"flex",alignItems:"center",justifyContent:"center",background:"linear-gradient(175deg,rgba(28,20,25,0.96),rgba(18,13,16,0.98))",fontFamily:body,fontStyle:"italic",fontSize:15,color:T.muted,textAlign:"center",padding:30}}>
+          {status==="error"?"Video room could not connect. Refresh and try again.":"Opening the real video room..."}
+        </div>
+      )}
+      <div style={{position:"absolute",top:14,left:14,right:14,zIndex:5,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,pointerEvents:"none"}}>
+        <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 12px",borderRadius:100,background:"rgba(18,13,16,0.76)",backdropFilter:"blur(8px)",border:"1px solid rgba(196,146,138,0.22)",fontFamily:sans,fontSize:10,fontWeight:600,letterSpacing:"0.14em",color:"rgba(245,236,230,0.84)"}}>
+          <span style={{width:6,height:6,borderRadius:"50%",background:T.rose,animation:"liveGlow 1.6s ease-in-out infinite",display:"inline-block"}}/>
+          REAL MATCH
+        </div>
+        <div style={{padding:"6px 10px",borderRadius:100,background:"rgba(18,13,16,0.72)",backdropFilter:"blur(8px)",border:"1px solid rgba(122,181,201,0.2)",fontFamily:sans,fontSize:10,color:"rgba(223,247,247,0.78)",maxWidth:170,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+          {remoteParticipant?matchedName||"Nearby match":"Waiting for video"}
+        </div>
+      </div>
+      <div key={activeQuestionIndex} style={{position:"absolute",top:58,left:18,right:112,padding:"12px 14px",borderRadius:15,background:"rgba(18,13,16,0.68)",backdropFilter:"blur(14px)",border:"1px solid rgba(196,146,138,0.16)",boxShadow:"0 10px 34px rgba(0,0,0,0.35)",animation:"fadeUp 0.35s ease",zIndex:5,pointerEvents:"none"}}>
+        <div style={{fontFamily:sans,fontSize:8,fontWeight:600,letterSpacing:"0.2em",textTransform:"uppercase",color:"rgba(196,146,138,0.55)",marginBottom:5}}>she asks</div>
+        <div style={{fontFamily:serif,fontSize:18,lineHeight:1.12,color:T.cream}}>{activeQuestion}</div>
+        <div style={{display:"flex",gap:4,marginTop:10}}>
+          {CALL_QUESTIONS.map((_,i)=><span key={i} style={{width:i===activeQuestionIndex?16:5,height:5,borderRadius:20,background:i===activeQuestionIndex?"rgba(196,146,138,0.85)":"rgba(196,146,138,0.22)",transition:"all 0.25s"}}/>)}
+        </div>
+      </div>
+      {localParticipant&&remoteParticipant&&(
+        <div style={{position:"absolute",top:60,right:18,width:86,height:118,borderRadius:13,overflow:"hidden",zIndex:6,background:"rgba(18,13,16,0.75)",border:"1px solid rgba(122,181,201,0.45)",boxShadow:"0 4px 28px rgba(0,0,0,0.55)"}}>
+          <video ref={localVideoRef} autoPlay playsInline muted style={{width:"100%",height:"100%",objectFit:"cover",transform:"scaleX(-1)"}}/>
+          <div style={{position:"absolute",left:7,bottom:7,padding:"3px 7px",borderRadius:100,background:"rgba(18,13,16,0.72)",fontFamily:sans,fontSize:8,fontWeight:600,letterSpacing:"0.12em",color:"#9bd0dc",textTransform:"uppercase"}}>you</div>
+        </div>
+      )}
+      {blurAmount>0&&(
+        <div style={{position:"absolute",left:"50%",top:"67%",transform:"translateX(-50%)",width:150,zIndex:5,textAlign:"center",pointerEvents:"none"}}>
+          <div style={{width:"100%",height:2,borderRadius:100,background:"rgba(245,236,230,0.18)",marginBottom:8,overflow:"hidden"}}>
+            <div style={{height:"100%",borderRadius:100,background:"linear-gradient(90deg,#c4928a,#d4a0a8)",width:`${100-(blurAmount/INITIAL_REVEAL_BLUR)*100}%`,transition:"width 1s linear"}}/>
+          </div>
+          <span style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:"rgba(245,236,230,0.72)",textShadow:"0 2px 10px rgba(0,0,0,0.75)"}}>revealing in {Math.ceil(blurAmount/REVEAL_BLUR_STEP)}s</span>
+        </div>
+      )}
+    </>
+  );
+};
 
 const RocketIcon=()=>(
   <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -1389,31 +1495,15 @@ function App(){
             <div style={{width:"100%",aspectRatio:"9/16",borderRadius:24,overflow:"hidden",background:`linear-gradient(175deg,${profile.hue}14 0%,${T.surface} 50%,${T.bg} 100%)`,border:pulseRing?"1px solid rgba(196,146,138,0.5)":"1px solid rgba(196,146,138,0.1)",position:"relative",marginBottom:12,boxShadow:pulseRing?"0 0 50px rgba(196,146,138,0.2),0 16px 60px rgba(0,0,0,0.6)":"0 16px 60px rgba(0,0,0,0.55)",transition:"border 0.5s,box-shadow 0.5s"}}>
               {matchCallUrl?(
                 <>
-                  <iframe
-                    title="Charisma live match"
-                    src={matchCallUrl}
-                    allow="camera; microphone; fullscreen; display-capture; autoplay"
-                    style={{position:"absolute",inset:0,width:"100%",height:"100%",border:0,background:"#080608",zIndex:1,filter:`blur(${blurAmount*0.32}px)`,transition:"filter 1.4s ease"}}
-                  />
-                  <div style={{position:"absolute",top:14,left:14,right:14,zIndex:3,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,pointerEvents:"none"}}>
-                    <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 12px",borderRadius:100,background:"rgba(18,13,16,0.76)",backdropFilter:"blur(8px)",border:"1px solid rgba(196,146,138,0.22)",fontFamily:sans,fontSize:10,fontWeight:600,letterSpacing:"0.14em",color:"rgba(245,236,230,0.84)"}}>
-                      <span style={{width:6,height:6,borderRadius:"50%",background:T.rose,animation:"liveGlow 1.6s ease-in-out infinite",display:"inline-block"}}/>
-                      REAL MATCH
-                    </div>
-                    <div style={{padding:"6px 10px",borderRadius:100,background:"rgba(18,13,16,0.72)",backdropFilter:"blur(8px)",border:"1px solid rgba(122,181,201,0.2)",fontFamily:sans,fontSize:10,color:"rgba(223,247,247,0.78)",maxWidth:170,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
-                      {matchedProfileName||"Nearby match"}
-                    </div>
-                  </div>
-                  <div style={{position:"absolute",left:14,right:14,bottom:14,zIndex:3,padding:"10px 12px",borderRadius:14,background:"rgba(18,13,16,0.68)",backdropFilter:"blur(10px)",border:"1px solid rgba(196,146,138,0.16)",fontFamily:body,fontStyle:"italic",fontSize:12,lineHeight:1.4,color:"rgba(245,236,230,0.78)",pointerEvents:"none"}}>
-                    If camera or mic asks again, allow it here. This is the real person room inside Charisma.
-                  </div>
-                  {blurAmount>0&&(
-                    <div style={{position:"absolute",left:"50%",top:"67%",transform:"translateX(-50%)",width:150,zIndex:4,textAlign:"center",pointerEvents:"none"}}>
-                      <div style={{width:"100%",height:2,borderRadius:100,background:"rgba(245,236,230,0.18)",marginBottom:8,overflow:"hidden"}}>
-                        <div style={{height:"100%",borderRadius:100,background:"linear-gradient(90deg,#c4928a,#d4a0a8)",width:`${100-(blurAmount/INITIAL_REVEAL_BLUR)*100}%`,transition:"width 1s linear"}}/>
-                      </div>
-                      <span style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:"rgba(245,236,230,0.72)",textShadow:"0 2px 10px rgba(0,0,0,0.75)"}}>revealing in {Math.ceil(blurAmount/REVEAL_BLUR_STEP)}s</span>
-                    </div>
+                  {matchCallUrl.includes("daily.co")&&window.DailyIframe?(
+                    <DailyLiveRoom url={matchCallUrl} name={userProfile.name||"Guest"} matchedName={matchedProfileName} blurAmount={blurAmount} activeQuestion={activeQuestion} activeQuestionIndex={activeQuestionIndex}/>
+                  ):(
+                    <iframe
+                      title="Charisma live match"
+                      src={matchCallUrl}
+                      allow="camera; microphone; fullscreen; display-capture; autoplay"
+                      style={{position:"absolute",inset:0,width:"100%",height:"100%",border:0,background:"#080608",zIndex:1,filter:`blur(${blurAmount*0.32}px)`,transition:"filter 1.4s ease"}}
+                    />
                   )}
                 </>
               ):(
