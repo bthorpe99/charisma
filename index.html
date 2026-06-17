@@ -473,6 +473,7 @@ function App(){
   const [profile,setProfile]=useState(PROFILES[0]);
   const [kept,setKept]=useState([]);
   const [showGifts,setShowGifts]=useState(false);
+  const [showDatePlanner,setShowDatePlanner]=useState(false);
   const [floating,setFloating]=useState([]);
   const [sentGifts,setSentGifts]=useState([]);
   const [pulseRing,setPulseRing]=useState(false);
@@ -796,7 +797,7 @@ function App(){
     await ensureBetaInvite();
   };
 
-  const saveDatePlan=()=>{
+  const saveDatePlan=(stayInCall=false)=>{
     if(!selectedRest||!selectedTime)return;
     const plan={
       id:`plan-${Date.now()}`,
@@ -815,6 +816,8 @@ function App(){
       return next;
     });
     setBookingDone(true);
+    setSafetyNotice(`Date plan saved: ${selectedRest.name} at ${selectedTime}.`);
+    if(stayInCall)setShowDatePlanner(false);
   };
 
   const keepSearchingAfterBooking=()=>{
@@ -872,7 +875,7 @@ function App(){
     if(!recordRevealStart())return;
     profileIndex=-1;
     setProfile(nextUnblockedProfile());
-    setSentGifts([]);setShowGifts(false);
+    setSentGifts([]);setShowGifts(false);setShowDatePlanner(false);
     setSelectedRest(null);setSelectedTime(null);setBookingDone(false);
     setScreen("connecting");
   };
@@ -888,15 +891,18 @@ function App(){
       return;
     }
     setProfile(nextUnblockedProfile());
-    setSentGifts([]);setFloating([]);setShowGifts(false);
+    setSentGifts([]);setFloating([]);setShowGifts(false);setShowDatePlanner(false);
+    setSelectedRest(null);setSelectedTime(null);setBookingDone(false);
     setScreen("connecting");
   };
 
   const goKeep=()=>{
     clearInterval(timerRef.current);clearInterval(blurRef.current);
     setKept(p=>[...p,profile]);
-    setShowGifts(false);
-    setSelectedRest(null);setSelectedTime(null);setBookingDone(false);
+    setShowGifts(false);setShowDatePlanner(false);
+    if(!bookingDone){
+      setSelectedRest(null);setSelectedTime(null);
+    }
     setScreen("end");
   };
 
@@ -1170,9 +1176,10 @@ function App(){
               </div>
             </div>
             {/* controls */}
-            <div style={{display:"flex",gap:8,marginBottom:8}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:8}}>
               <button className="btn" onClick={goNext} style={{flex:1,padding:"15px 0",borderRadius:13,fontSize:13,color:T.muted,background:T.card,border:`1px solid ${T.border}`,letterSpacing:"0.05em"}}>pass ⟶</button>
-              <button className="btn" onClick={()=>setShowGifts(!showGifts)} style={{flex:1,padding:"15px 0",borderRadius:13,fontSize:13,color:T.gold,background:showGifts?"rgba(201,168,122,0.14)":"rgba(201,168,122,0.07)",border:`1px solid rgba(201,168,122,${showGifts?"0.35":"0.16"})`,letterSpacing:"0.05em"}}>🌸 gift</button>
+              <button className="btn" onClick={()=>{setShowGifts(!showGifts);setShowDatePlanner(false);}} style={{flex:1,padding:"15px 0",borderRadius:13,fontSize:13,color:T.gold,background:showGifts?"rgba(201,168,122,0.14)":"rgba(201,168,122,0.07)",border:`1px solid rgba(201,168,122,${showGifts?"0.35":"0.16"})`,letterSpacing:"0.05em"}}>🌸 gift</button>
+              <button className="btn" onClick={()=>{setShowDatePlanner(!showDatePlanner);setShowGifts(false);}} style={{flex:1,padding:"15px 0",borderRadius:13,fontSize:13,color:showDatePlanner?T.cream:T.muted,background:showDatePlanner?"rgba(196,146,138,0.18)":T.card,border:`1px solid ${showDatePlanner?"rgba(196,146,138,0.34)":T.border}`,letterSpacing:"0.05em"}}>plan</button>
               <button className="btn" onClick={goKeep} style={{flex:1,padding:"15px 0",borderRadius:13,fontSize:13,color:T.cream,background:"linear-gradient(145deg,#c4928a,#a06870)",boxShadow:"0 4px 24px rgba(196,146,138,0.28)",letterSpacing:"0.05em"}}>keep ❧</button>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:7,marginBottom:8}}>
@@ -1180,6 +1187,46 @@ function App(){
               <button className="btn" onClick={blockProfile} style={{padding:"10px 0",borderRadius:11,fontSize:11,color:T.muted,background:"rgba(196,146,138,0.06)",border:"1px solid rgba(196,146,138,0.12)",letterSpacing:"0.06em"}}>Block</button>
               <button className="btn" onClick={endCall} style={{padding:"10px 0",borderRadius:11,fontSize:11,color:"rgba(245,236,230,0.86)",background:"rgba(212,160,168,0.12)",border:"1px solid rgba(212,160,168,0.24)",letterSpacing:"0.06em"}}>End</button>
             </div>
+            {showDatePlanner&&(
+              <div className="glass" style={{padding:16,marginBottom:8,animation:"fadeUp 0.22s ease"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginBottom:12}}>
+                  <span style={{fontFamily:serif,fontStyle:"italic",fontSize:16,color:T.cream}}>plan while you talk</span>
+                  <span style={{fontFamily:sans,fontSize:10,letterSpacing:"0.16em",textTransform:"uppercase",color:"rgba(196,146,138,0.45)"}}>live meet</span>
+                </div>
+                <div style={{display:"flex",gap:7,marginBottom:11}}>
+                  {["Tonight","Tomorrow","This Weekend"].map(d=>(
+                    <button key={d} onClick={()=>setBookingDate(d)} className="btn" style={{flex:1,padding:"8px 4px",borderRadius:10,fontSize:11,fontWeight:500,background:bookingDate===d?"#c4928a":"rgba(196,146,138,0.07)",color:bookingDate===d?"#fff":T.muted,border:bookingDate===d?"none":"1px solid rgba(196,146,138,0.12)",transition:"all 0.2s"}}>{d}</button>
+                  ))}
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+                  <span style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:T.muted}}>Party of</span>
+                  {[2,3,4].map(n=>(
+                    <button key={n} onClick={()=>setBookingParty(n)} className="btn" style={{width:30,height:30,borderRadius:"50%",fontSize:13,fontWeight:600,background:bookingParty===n?"#c4928a":"rgba(196,146,138,0.07)",color:bookingParty===n?"#fff":T.muted,border:bookingParty===n?"none":"1px solid rgba(196,146,138,0.12)",transition:"all 0.2s"}}>{n}</button>
+                  ))}
+                </div>
+                <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.2em",color:"rgba(196,146,138,0.4)",textTransform:"uppercase",marginBottom:6}}>Nearby · {location?userProfile.city||region:profile.city}</p>
+                <p style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:restaurantStatus==="error"?"rgba(212,160,168,0.72)":T.muted,marginBottom:10}}>
+                  {restaurantStatus==="loading"?"Finding real nearby restaurants...":restaurantStatus==="loaded"?"Pick a place together while the meet is live.":restaurantStatus==="error"?restaurantError:"Choose a place for the date."}
+                </p>
+                <div className="scroll-thin" style={{maxHeight:185,overflowY:"auto",paddingRight:2}}>
+                  {restaurants.map(r=>(
+                    <RestaurantCard key={r.id} r={r} selected={selectedRest?.id===r.id} onSelect={r=>{setSelectedRest(r);setSelectedTime(null);}}/>
+                  ))}
+                </div>
+                {selectedRest&&(
+                  <div style={{marginTop:10,animation:"fadeUp 0.2s ease"}}>
+                    <p style={{fontFamily:serif,fontStyle:"italic",fontSize:15,color:T.cream,marginBottom:2}}>{selectedRest.name}</p>
+                    <p style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:T.muted,marginBottom:2}}>Choose a time for {bookingDate.toLowerCase()}</p>
+                    <TimeSlots times={selectedRest.times} selected={selectedTime} onSelect={setSelectedTime}/>
+                  </div>
+                )}
+                {selectedRest&&selectedTime&&(
+                  <button className="btn" onClick={()=>saveDatePlan(true)} style={{width:"100%",marginTop:12,padding:"14px 0",borderRadius:13,fontSize:13,color:T.cream,letterSpacing:"0.07em",background:"linear-gradient(145deg,#c4928a,#a06870)",boxShadow:"0 6px 28px rgba(196,146,138,0.24)",animation:"fadeUp 0.25s ease"}}>
+                    Save plan · {bookingParty} guests · {selectedTime}
+                  </button>
+                )}
+              </div>
+            )}
             {showGifts&&(
               <div className="glass" style={{padding:18,animation:"fadeUp 0.22s ease"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
