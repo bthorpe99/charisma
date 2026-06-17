@@ -37,13 +37,15 @@ service cloud.firestore {
 }
 ```
 
-## 4. Copy the public web config
+## 4. Public web config
 
-Open:
+The Charisma Firebase web config for `charisma-c88cf` is already pasted into `index.html`.
+
+If you ever need to replace it, open:
 
 `Project settings` -> `General` -> `Your apps` -> Web app
 
-Copy the Firebase config values.
+Copy the Firebase config values and paste them into `FIREBASE_CONFIG`.
 
 ## 5. Paste them into `index.html`
 
