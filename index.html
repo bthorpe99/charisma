@@ -253,7 +253,36 @@ const REGIONS_BY_LANGUAGE={
 const FREE_REVEAL_LIMIT=4;
 const ACCESS_RESET_MS=24*60*60*1000;
 const DEFAULT_ACCESS={windowStart:Date.now(),callsUsed:0};
-const DEFAULT_PROFILE={name:"",age:"",city:"",role:"",intent:"Real dates",wallet:1200,isMember:false,email:"",hasAccount:false,giftsSent:[],giftsReceived:[]};
+const IDENTITY_OPTIONS=[
+  "Woman",
+  "Man",
+  "Nonbinary",
+  "Trans woman",
+  "Trans man",
+  "Gender-fluid",
+  "Queer",
+  "Prefer to say later"
+];
+const INTEREST_OPTIONS=[
+  "Women",
+  "Men",
+  "Nonbinary people",
+  "Trans women",
+  "Trans men",
+  "Queer people",
+  "Open to all"
+];
+const ORIENTATION_OPTIONS=[
+  "Straight",
+  "Gay",
+  "Lesbian",
+  "Bisexual",
+  "Pansexual",
+  "Queer",
+  "Questioning",
+  "Prefer to say later"
+];
+const DEFAULT_PROFILE={name:"",age:"",city:"",role:"",identity:"",interestedIn:["Open to all"],orientation:"",intent:"Real dates",wallet:1200,isMember:false,email:"",hasAccount:false,giftsSent:[],giftsReceived:[]};
 const DEFAULT_ACCOUNT={email:"",password:""};
 const LIVE_SITE_URL="https://trycharisma.live/";
 const SUPPORT_EMAIL="support@trycharisma.live";
@@ -735,6 +764,26 @@ function App(){
   const canStartReveal=hasUnlimitedAccess||freeCallsLeft>0;
   const profileComplete=Boolean(userProfile.name&&userProfile.age&&userProfile.city&&userProfile.role);
   const memberNeedsAccount=Boolean(userProfile.isMember&&!userProfile.hasAccount);
+  const normalizeInterestLabel=value=>{
+    if(value==="Open to all")return "Open to all";
+    return String(value||"").replace(/\s+people$/i,"").replace(/s$/,"");
+  };
+  const profileWantsCandidate=(viewer,candidate)=>{
+    const wants=Array.isArray(viewer?.interestedIn)?viewer.interestedIn:[];
+    if(!wants.length||wants.includes("Open to all"))return true;
+    const candidateIdentity=candidate?.identity||candidate?.role||"";
+    if(!candidateIdentity)return true;
+    return wants.some(item=>normalizeInterestLabel(item).toLowerCase()===candidateIdentity.toLowerCase());
+  };
+  const toggleInterest=interest=>{
+    setProfileDraft(p=>{
+      const current=Array.isArray(p.interestedIn)?p.interestedIn:[];
+      if(interest==="Open to all")return {...p,interestedIn:["Open to all"]};
+      const withoutOpen=current.filter(item=>item!=="Open to all");
+      const next=withoutOpen.includes(interest)?withoutOpen.filter(item=>item!==interest):[...withoutOpen,interest];
+      return {...p,interestedIn:next.length?next:["Open to all"]};
+    });
+  };
 
   const saveProfile=()=>{
     const next={
@@ -743,6 +792,9 @@ function App(){
       age:String(profileDraft.age||"").trim(),
       city:String(profileDraft.city||"").trim(),
       role:profileDraft.role||"",
+      identity:profileDraft.identity||profileDraft.role||"",
+      interestedIn:Array.isArray(profileDraft.interestedIn)&&profileDraft.interestedIn.length?profileDraft.interestedIn:["Open to all"],
+      orientation:profileDraft.orientation||"",
       intent:profileDraft.intent||"Real dates",
       isMember:Boolean(profileDraft.isMember),
       wallet:Number(profileDraft.wallet)||coins||1200
@@ -781,6 +833,9 @@ function App(){
           displayName:userProfile.name||profileDraft.name||"",
           city:userProfile.city||profileDraft.city||"",
           role:userProfile.role||profileDraft.role||"",
+          identity:userProfile.identity||profileDraft.identity||userProfile.role||profileDraft.role||"",
+          interestedIn:userProfile.interestedIn||profileDraft.interestedIn||["Open to all"],
+          orientation:userProfile.orientation||profileDraft.orientation||"",
           intent:userProfile.intent||profileDraft.intent||"Real dates",
           wallet:coins,
           isMember:true,
@@ -1059,6 +1114,7 @@ function App(){
       const candidates=waiting.docs
         .map(doc=>({id:doc.id,...doc.data()}))
         .filter(item=>item.id!==uid&&item.language===language&&item.region===region)
+        .filter(item=>profileWantsCandidate(userProfile,item)&&profileWantsCandidate(item,userProfile))
         .filter(item=>!myLocation||!item.location||matchMilesBetween(myLocation,item.location)<=50);
       const candidate=candidates[0];
       if(candidate){
@@ -1100,6 +1156,10 @@ function App(){
         uid,
         name:profileName,
         role:userProfile.role,
+        identity:userProfile.identity||userProfile.role||"",
+        interestedIn:userProfile.interestedIn||["Open to all"],
+        orientation:userProfile.orientation||"",
+        intent:userProfile.intent||"Real dates",
         language,
         region,
         location:myLocation,
@@ -1387,13 +1447,37 @@ function App(){
                     <button key={role} className="btn" onClick={()=>setProfileDraft(p=>({...p,role}))} style={{padding:"11px 8px",borderRadius:11,fontSize:12,background:profileDraft.role===role?"rgba(196,146,138,0.18)":"rgba(196,146,138,0.06)",border:profileDraft.role===role?"1px solid rgba(196,146,138,0.5)":"1px solid rgba(196,146,138,0.12)",color:profileDraft.role===role?T.cream:T.muted}}>{role==="Woman"?"I'm a woman - free":"I'm a man"}</button>
                   ))}
                 </div>
+                <p style={{fontFamily:body,fontStyle:"italic",fontSize:11,color:"rgba(154,136,128,0.58)",lineHeight:1.45,marginTop:7}}>This only controls beta access. Your dating identity is separate.</p>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr",gap:8,marginBottom:12}}>
+                <select value={profileDraft.identity||""} onChange={e=>setProfileDraft(p=>({...p,identity:e.target.value}))} style={{padding:"12px 12px",borderRadius:11,border:"1px solid rgba(196,146,138,0.14)",background:"rgba(18,13,16,0.84)",color:T.cream,fontFamily:sans,fontSize:13,outline:"none"}}>
+                  <option value="">I identify as...</option>
+                  {IDENTITY_OPTIONS.map(v=><option key={v} value={v}>{v}</option>)}
+                </select>
+                <select value={profileDraft.orientation||""} onChange={e=>setProfileDraft(p=>({...p,orientation:e.target.value}))} style={{padding:"12px 12px",borderRadius:11,border:"1px solid rgba(196,146,138,0.14)",background:"rgba(18,13,16,0.84)",color:T.cream,fontFamily:sans,fontSize:13,outline:"none"}}>
+                  <option value="">Orientation / preference</option>
+                  {ORIENTATION_OPTIONS.map(v=><option key={v} value={v}>{v}</option>)}
+                </select>
+              </div>
+              <div style={{marginBottom:12}}>
+                <div style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted,marginBottom:8}}>Show me</div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8}}>
+                  {INTEREST_OPTIONS.map(interest=>{
+                    const selected=(profileDraft.interestedIn||[]).includes(interest);
+                    return (
+                      <button key={interest} className="btn" onClick={()=>toggleInterest(interest)} style={{padding:"10px 7px",borderRadius:11,fontSize:11,background:selected?"rgba(122,181,201,0.16)":"rgba(196,146,138,0.05)",border:selected?"1px solid rgba(122,181,201,0.48)":"1px solid rgba(196,146,138,0.1)",color:selected?T.cream:T.muted}}>
+                        {interest}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
               <div style={{display:"flex",gap:8,alignItems:"center"}}>
                 <button className="btn" onClick={saveProfile} style={{flex:1,padding:"12px 10px",borderRadius:12,fontSize:12,color:T.cream,background:"rgba(196,146,138,0.14)",border:"1px solid rgba(196,146,138,0.25)",letterSpacing:"0.08em"}}>{profileComplete?"Update profile":"Save profile"}</button>
                 <div style={{padding:"10px 12px",borderRadius:12,background:"rgba(201,168,122,0.1)",border:"1px solid rgba(201,168,122,0.18)",fontFamily:sans,fontSize:12,color:T.gold,whiteSpace:"nowrap"}}>❧ {coins.toLocaleString()}</div>
               </div>
               <p style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:profileComplete?"rgba(154,220,190,0.75)":"rgba(154,136,128,0.58)",lineHeight:1.45,marginTop:10,textAlign:"center"}}>
-                {profileComplete?`${userProfile.name}, ${userProfile.age} · ${userProfile.city} · ${userProfile.role} · ${userProfile.intent}`:"Save a profile so gifts and Grace Points belong to someone."}
+                {profileComplete?`${userProfile.name}, ${userProfile.age} · ${userProfile.city} · ${userProfile.identity||userProfile.role} · wants ${(userProfile.interestedIn||["Open to all"]).join(", ")} · ${userProfile.intent}`:"Save a profile so gifts and Grace Points belong to someone."}
               </p>
             </div>
             <div className="glass" style={{padding:"18px 18px",marginBottom:22,textAlign:"left"}}>
