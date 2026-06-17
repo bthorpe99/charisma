@@ -251,6 +251,7 @@ const ACCESS_RESET_MS=24*60*60*1000;
 const DEFAULT_ACCESS={windowStart:Date.now(),callsUsed:0};
 const DEFAULT_PROFILE={name:"",age:"",city:"",role:"",intent:"Real dates",wallet:1200,isMember:false,giftsSent:[],giftsReceived:[]};
 const LIVE_SITE_URL="https://trycharisma.live/";
+const SUPPORT_EMAIL="support@trycharisma.live";
 const STRIPE_LINKS={
   membership:"https://buy.stripe.com/6oUfZifBEeXg1S88FX7N600",
   grace500:"https://buy.stripe.com/00w4gA3SW4iCdAQ1dv7N601",
@@ -262,6 +263,24 @@ const GRACE_PACKS=[
   {id:"grace1200",label:"1,200 Grace Points",points:1200,price:"$9.99"},
   {id:"grace3000",label:"3,000 Grace Points",points:3000,price:"$19.99"}
 ];
+const LEGAL_CONTENT={
+  safety:{
+    title:"Safety",
+    body:["Charisma is for adults 18+ only. Use public places for first dates, keep your exact address private until trust is established, and tell a friend where you are going.","If someone makes you uncomfortable, end the call, block them, and report the interaction. For emergencies, contact local authorities immediately."]
+  },
+  privacy:{
+    title:"Privacy",
+    body:["Charisma Private Beta stores profile, wallet, access, and date-plan information in your browser during this beta. Camera and location permissions are requested by your browser and are used to power preview, matching, and nearby date suggestions.","Payments are handled by Stripe. Charisma does not store your card number in this static beta."]
+  },
+  terms:{
+    title:"Terms",
+    body:["By using Charisma Private Beta, you agree that you are at least 18 years old and that beta features may change while the product is being tested.","Grace Points and membership unlocks are beta functionality. Real production enforcement will require accounts, server-side storage, and Stripe webhook verification."]
+  },
+  support:{
+    title:"Support",
+    body:[`For help, safety issues, payment questions, or beta feedback, contact ${SUPPORT_EMAIL}. Include the device, browser, and what happened so we can troubleshoot faster.`]
+  }
+};
 const BACKGROUND_VIDEOS=[
   "assets/videos/date-night-smile.mp4",
   "assets/videos/moody-romance.mp4",
@@ -390,9 +409,9 @@ const CharismaButton=({children,variant="primary",onClick,style={}})=>(
   </button>
 );
 
-const CharismaFooter=({onStart})=>{
+const CharismaFooter=({onStart,onLegal})=>{
   const menuA=["Live Reveal","Guided Questions","Grace Gifts","Date Planning"];
-  const menuB=["Language Match","Region Check","Camera Ready","Beta Rooms"];
+  const menuB=[["Safety","safety"],["Privacy","privacy"],["Terms","terms"],["Support","support"]];
   return(
     <div style={{animation:"fadeUp 0.7s ease",marginTop:26,marginBottom:28,background:"rgba(255,255,240,0.94)",backdropFilter:"blur(18px)",borderRadius:28,padding:"24px 22px",boxShadow:"0 18px 60px rgba(0,0,0,0.28)",border:"1px solid rgba(255,255,255,0.28)",fontFamily:"'Geist','Jost',sans-serif",color:"#060606",textAlign:"left"}}>
       <div style={{display:"grid",gridTemplateColumns:"1fr",gap:22}}>
@@ -408,12 +427,18 @@ const CharismaFooter=({onStart})=>{
           <CharismaButton variant="secondary" onClick={()=>window.scrollTo({top:0,behavior:"smooth"})} style={{padding:"9px 16px",fontSize:12}}>Back To Setup</CharismaButton>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:18}}>
-          {[["Inside Charisma",menuA],["Trust Checks",menuB]].map(([title,items])=>(
-            <div key={title} style={{display:"flex",flexDirection:"column",gap:9}}>
-              <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"#060606"}}>{title}</div>
-              {items.map(item=><span key={item} style={{fontSize:13,fontWeight:600,color:"rgba(6,6,6,0.68)",whiteSpace:"nowrap"}}>{item}</span>)}
-            </div>
-          ))}
+          <div style={{display:"flex",flexDirection:"column",gap:9}}>
+            <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"#060606"}}>Inside Charisma</div>
+            {menuA.map(item=><span key={item} style={{fontSize:13,fontWeight:600,color:"rgba(6,6,6,0.68)",whiteSpace:"nowrap"}}>{item}</span>)}
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:9}}>
+            <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"#060606"}}>Trust</div>
+            {menuB.map(([item,key])=>(
+              <button key={key} className="btn" onClick={()=>onLegal(key)} style={{padding:0,textAlign:"left",background:"transparent",border:"none",fontSize:13,fontWeight:600,color:"rgba(6,6,6,0.68)",whiteSpace:"nowrap",letterSpacing:0}}>
+                {item}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
       <div style={{marginTop:24,display:"flex",flexWrap:"wrap",gap:"4px 14px",fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.02em",color:"rgba(6,6,6,0.38)"}}>
@@ -473,6 +498,12 @@ function App(){
   const [betaRoom,setBetaRoom]=useState(()=>new URLSearchParams(window.location.search).get("room")||"");
   const [inviteCopied,setInviteCopied]=useState(false);
   const [backgroundVideoIndex,setBackgroundVideoIndex]=useState(0);
+  const [legalModal,setLegalModal]=useState(null);
+  const [safetyNotice,setSafetyNotice]=useState("");
+  const [blockedProfiles,setBlockedProfiles]=useState(()=>{
+    try{return JSON.parse(localStorage.getItem("charismaBlockedProfiles")||"[]");}
+    catch(err){return [];}
+  });
   const timerRef=useRef(null);
   const blurRef=useRef(null);
   const videoRef=useRef(null);
@@ -806,12 +837,41 @@ function App(){
     setTimeout(()=>setPulseRing(false),900);
   };
 
+  const nextUnblockedProfile=()=>{
+    const blocked=new Set(blockedProfiles);
+    for(let i=0;i<PROFILES.length;i++){
+      profileIndex=(profileIndex+1)%PROFILES.length;
+      if(!blocked.has(PROFILES[profileIndex].id))return PROFILES[profileIndex];
+    }
+    return PROFILES[profileIndex];
+  };
+
+  const reportProfile=()=>{
+    const report={profileId:profile.id,name:profile.name,at:new Date().toISOString()};
+    const reports=JSON.parse(localStorage.getItem("charismaReports")||"[]");
+    localStorage.setItem("charismaReports",JSON.stringify([report,...reports].slice(0,20)));
+    setSafetyNotice(`${profile.name} was reported. Our beta team will review this when backend moderation is connected.`);
+  };
+
+  const blockProfile=()=>{
+    const next=[...new Set([...blockedProfiles,profile.id])];
+    setBlockedProfiles(next);
+    localStorage.setItem("charismaBlockedProfiles",JSON.stringify(next));
+    setSafetyNotice(`${profile.name} was blocked and removed from your beta rotation.`);
+    goNext();
+  };
+
+  const endCall=()=>{
+    setSafetyNotice("Call ended.");
+    goHome();
+  };
+
   const startOver=async()=>{
     if(!profileComplete||!language||!region||locationStatus!=="confirmed")return;
     if(!await ensureCameraLive())return;
     if(!recordRevealStart())return;
-    profileIndex=0;
-    setProfile(PROFILES[profileIndex]);
+    profileIndex=-1;
+    setProfile(nextUnblockedProfile());
     setSentGifts([]);setShowGifts(false);
     setSelectedRest(null);setSelectedTime(null);setBookingDone(false);
     setScreen("connecting");
@@ -827,8 +887,7 @@ function App(){
       setScreen("home");
       return;
     }
-    profileIndex=(profileIndex+1)%PROFILES.length;
-    setProfile(PROFILES[profileIndex]);
+    setProfile(nextUnblockedProfile());
     setSentGifts([]);setFloating([]);setShowGifts(false);
     setScreen("connecting");
   };
@@ -876,9 +935,28 @@ function App(){
         <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse 100% 100% at 50% 50%,transparent 40%,rgba(18,13,16,0.55) 100%)"}}/>
       </div>
 
+      {legalModal&&(
+        <div style={{position:"fixed",inset:0,zIndex:500,background:"rgba(18,13,16,0.76)",backdropFilter:"blur(12px)",display:"flex",alignItems:"center",justifyContent:"center",padding:22}} onClick={()=>setLegalModal(null)}>
+          <div className="glass" onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:420,padding:"24px 22px",boxShadow:"0 22px 80px rgba(0,0,0,0.58)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",gap:16,alignItems:"center",marginBottom:14}}>
+              <h2 style={{fontFamily:serif,fontSize:30,fontWeight:300,color:T.cream,margin:0}}>{LEGAL_CONTENT[legalModal].title}</h2>
+              <button className="btn" onClick={()=>setLegalModal(null)} style={{width:34,height:34,borderRadius:"50%",background:"rgba(196,146,138,0.1)",border:"1px solid rgba(196,146,138,0.18)",color:T.cream,fontSize:18}}>×</button>
+            </div>
+            {LEGAL_CONTENT[legalModal].body.map((line,i)=>(
+              <p key={i} style={{fontFamily:body,fontStyle:"italic",fontSize:14,lineHeight:1.65,color:T.muted,marginBottom:i===LEGAL_CONTENT[legalModal].body.length-1?0:12}}>{line}</p>
+            ))}
+          </div>
+        </div>
+      )}
+
       {screen==="connecting"&&<CountdownRing onDone={()=>setScreen("call")}/>}
 
       <div style={{position:"relative",zIndex:1,width:"100%",maxWidth:400,padding:"0 20px"}}>
+        {safetyNotice&&(
+          <div className="glass" style={{padding:"11px 14px",marginBottom:12,fontFamily:body,fontStyle:"italic",fontSize:13,lineHeight:1.45,color:"rgba(245,236,230,0.82)",textAlign:"center",animation:"fadeUp 0.22s ease"}}>
+            {safetyNotice}
+          </div>
+        )}
 
         {/* ── HOME ── */}
         {screen==="home"&&(
@@ -1007,6 +1085,15 @@ function App(){
                 {betaRoom?(inviteCopied?"Copied invite link":"Copy beta invite link"):"Create beta invite link"}
               </button>
             </div>
+            <div className="glass" style={{padding:"16px 18px",marginBottom:22,textAlign:"left"}}>
+              <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.24em",color:"rgba(196,146,138,0.45)",textTransform:"uppercase",marginBottom:10}}>Beta safety</p>
+              <p style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted,lineHeight:1.55,marginBottom:12}}>18+ only. Meet in public, keep your exact address private, and use report/block if a match feels off.</p>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7}}>
+                {[["Safety","safety"],["Privacy","privacy"],["Terms","terms"],["Support","support"]].map(([label,key])=>(
+                  <button key={key} className="btn" onClick={()=>setLegalModal(key)} style={{padding:"10px 4px",borderRadius:10,fontSize:10,color:T.cream,background:"rgba(196,146,138,0.08)",border:"1px solid rgba(196,146,138,0.16)",letterSpacing:"0.06em"}}>{label}</button>
+                ))}
+              </div>
+            </div>
             {kept.length>0&&(
               <div style={{display:"flex",alignItems:"center",gap:10,justifyContent:"center",marginBottom:22}}>
                 <span style={{fontFamily:body,fontStyle:"italic",color:T.muted,fontSize:13}}>kept:</span>
@@ -1017,7 +1104,7 @@ function App(){
             )}
             <button className="btn" onClick={startOver} disabled={!setupComplete} style={{width:"100%",padding:"18px 0",borderRadius:14,fontSize:15,color:T.cream,letterSpacing:"0.08em",background:setupComplete?"linear-gradient(145deg,#c4928a,#a06870)":"rgba(196,146,138,0.12)",boxShadow:setupComplete?"0 8px 40px rgba(196,146,138,0.3)":"none",marginBottom:12,opacity:setupComplete?1:0.55}}>Begin ❧</button>
             <p style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:"rgba(154,136,128,0.4)"}}>language, location, and camera are confirmed first</p>
-            <CharismaFooter onStart={startOver}/>
+            <CharismaFooter onStart={startOver} onLegal={setLegalModal}/>
           </div>
         )}
 
@@ -1097,6 +1184,11 @@ function App(){
               <button className="btn" onClick={goNext} style={{flex:1,padding:"15px 0",borderRadius:13,fontSize:13,color:T.muted,background:T.card,border:`1px solid ${T.border}`,letterSpacing:"0.05em"}}>pass ⟶</button>
               <button className="btn" onClick={()=>setShowGifts(!showGifts)} style={{flex:1,padding:"15px 0",borderRadius:13,fontSize:13,color:T.gold,background:showGifts?"rgba(201,168,122,0.14)":"rgba(201,168,122,0.07)",border:`1px solid rgba(201,168,122,${showGifts?"0.35":"0.16"})`,letterSpacing:"0.05em"}}>🌸 gift</button>
               <button className="btn" onClick={goKeep} style={{flex:1,padding:"15px 0",borderRadius:13,fontSize:13,color:T.cream,background:"linear-gradient(145deg,#c4928a,#a06870)",boxShadow:"0 4px 24px rgba(196,146,138,0.28)",letterSpacing:"0.05em"}}>keep ❧</button>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:7,marginBottom:8}}>
+              <button className="btn" onClick={reportProfile} style={{padding:"10px 0",borderRadius:11,fontSize:11,color:T.muted,background:"rgba(196,146,138,0.06)",border:"1px solid rgba(196,146,138,0.12)",letterSpacing:"0.06em"}}>Report</button>
+              <button className="btn" onClick={blockProfile} style={{padding:"10px 0",borderRadius:11,fontSize:11,color:T.muted,background:"rgba(196,146,138,0.06)",border:"1px solid rgba(196,146,138,0.12)",letterSpacing:"0.06em"}}>Block</button>
+              <button className="btn" onClick={endCall} style={{padding:"10px 0",borderRadius:11,fontSize:11,color:"rgba(245,236,230,0.86)",background:"rgba(212,160,168,0.12)",border:"1px solid rgba(212,160,168,0.24)",letterSpacing:"0.06em"}}>End</button>
             </div>
             {showGifts&&(
               <div className="glass" style={{padding:18,animation:"fadeUp 0.22s ease"}}>
@@ -1208,6 +1300,10 @@ function App(){
                   <span style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.cream}}>{val}</span>
                 </div>
               ))}
+            </div>
+            <div className="glass" style={{padding:"14px 16px",marginBottom:16,textAlign:"left",border:"1px solid rgba(122,181,201,0.22)",background:"rgba(122,181,201,0.07)"}}>
+              <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.2em",color:"rgba(223,247,247,0.68)",textTransform:"uppercase",marginBottom:8}}>Safety reminder</p>
+              <p style={{fontFamily:body,fontStyle:"italic",fontSize:13,lineHeight:1.5,color:T.muted}}>Meet in public, keep your exact address private, and share your plans with someone you trust.</p>
             </div>
             {betaInviteLink&&(
               <div style={{padding:"10px 12px",borderRadius:10,background:"rgba(18,13,16,0.45)",border:"1px solid rgba(196,146,138,0.1)",fontFamily:sans,fontSize:10,color:"rgba(245,236,230,0.72)",lineHeight:1.45,wordBreak:"break-all",marginBottom:12,textAlign:"left"}}>{betaInviteLink}</div>
