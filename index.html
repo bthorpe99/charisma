@@ -283,10 +283,13 @@ const ORIENTATION_OPTIONS=[
   "Questioning",
   "Prefer to say later"
 ];
-const DEFAULT_PROFILE={name:"",age:"",city:"",role:"",identity:"",interestedIn:[],orientation:"",intent:"Real dates",wallet:1200,isMember:false,email:"",hasAccount:false,giftsSent:[],giftsReceived:[]};
+const TERMS_VERSION="2026-06-18";
+const DEFAULT_PROFILE={name:"",age:"",city:"",role:"",identity:"",interestedIn:[],orientation:"",intent:"Real dates",wallet:0,isMember:false,membershipStatus:"inactive",callsUsed:0,callWindowStart:null,email:"",hasAccount:false,termsAccepted:false,giftsSent:[],giftsReceived:[]};
 const DEFAULT_ACCOUNT={email:"",password:""};
 const LIVE_SITE_URL="https://trycharisma.live/";
 const SUPPORT_EMAIL="support@trycharisma.live";
+const MATCH_API_URL="https://us-central1-charisma-c88cf.cloudfunctions.net/matchApi";
+const ACCOUNT_API_URL="https://us-central1-charisma-c88cf.cloudfunctions.net/accountApi";
 const STRIPE_LINKS={
   membership:"https://buy.stripe.com/6oUfZifBEeXg1S88FX7N600",
   grace500:"https://buy.stripe.com/00w4gA3SW4iCdAQ1dv7N601",
@@ -319,15 +322,15 @@ const GRACE_PACKS=[
 const LEGAL_CONTENT={
   safety:{
     title:"Safety",
-    body:["Charisma is for adults 18+ only. Use public places for first dates, keep your exact address private until trust is established, and tell a friend where you are going.","If someone makes you uncomfortable, end the call, block them, and report the interaction. For emergencies, contact local authorities immediately."]
+    body:["Charisma is for adults 18+ only. Use public places for first dates, keep your exact address private until trust is established, and tell a friend where you are going.","Harassment, threats, hate, impersonation, sexual exploitation, scams, and sharing another person's private information are prohibited. End, block, and report any unsafe interaction.","Reports are stored securely for moderation review. For immediate danger or emergencies, contact local authorities."]
   },
   privacy:{
     title:"Privacy",
-    body:["Charisma stores profile, wallet, access, and date-plan information for your account experience. Camera and location permissions are requested by your browser and are used to power preview, matching, and nearby date suggestions.","Payments are handled by Stripe. Charisma does not store your card number."]
+    body:["Charisma stores account, profile, preferences, wallet, access, safety actions, and date-plan information needed to provide the service. You may delete your account from the Secure Account panel.","Camera and microphone media are used for the live room and are not recorded by Charisma. Precise location stays in your browser; matching stores only a coarse nearby area and removes stale queue entries automatically.","Payments are handled by Stripe. Charisma does not store your card number. Reports and transaction records may be retained as needed for safety, fraud prevention, refunds, and legal obligations."]
   },
   terms:{
     title:"Terms",
-    body:["By using Charisma, you agree that you are at least 18 years old and that live features may change as the product improves.","Grace Points and membership unlocks are connected to your account. Payment verification is handled through Stripe and Firebase."]
+    body:["By using Charisma, you confirm that you are at least 18 years old, will provide truthful profile information, and will follow the safety rules and community standards.","Grace Points and membership access are connected to your verified account. Payments, renewals, cancellations, and refunds are processed through Stripe. Refunded digital benefits may be removed from the account.","Charisma may suspend accounts that create safety risks, abuse payments, evade blocks, or misuse live video. Beta features may change while the service improves."]
   },
   support:{
     title:"Support",
@@ -625,6 +628,9 @@ function App(){
     catch(err){return DEFAULT_ACCOUNT;}
   });
   const [showAccountSetup,setShowAccountSetup]=useState(false);
+  const [authUser,setAuthUser]=useState(null);
+  const [emailVerified,setEmailVerified]=useState(false);
+  const [authMode,setAuthMode]=useState("signup");
   const [accountNotice,setAccountNotice]=useState("");
   const [authProvider,setAuthProvider]=useState(()=>getFirebaseServices()?"firebase":"local");
   const [revealAccess,setRevealAccess]=useState(()=>{
@@ -666,6 +672,7 @@ function App(){
   const [matchRoom,setMatchRoom]=useState("");
   const [matchCallUrl,setMatchCallUrl]=useState("");
   const [matchedProfileName,setMatchedProfileName]=useState("");
+  const [matchedUserId,setMatchedUserId]=useState("");
   const [backgroundVideoIndex,setBackgroundVideoIndex]=useState(0);
   const [legalModal,setLegalModal]=useState(null);
   const [safetyNotice,setSafetyNotice]=useState("");
@@ -678,6 +685,7 @@ function App(){
   const videoRef=useRef(null);
   const streamRef=useRef(null);
   const matchUnsubRef=useRef(null);
+  const memberUnsubRef=useRef(null);
 
   useEffect(()=>{
     if(screen!=="call")return;
@@ -724,31 +732,40 @@ function App(){
     if(!services)return;
     setAuthProvider("firebase");
     const unsubscribe=services.auth.onAuthStateChanged(authUser=>{
-      if(!authUser?.email)return;
-      setUserProfile(p=>({...p,email:authUser.email,hasAccount:true}));
-      setProfileDraft(p=>({...p,email:authUser.email,hasAccount:true}));
+      memberUnsubRef.current?.();
+      memberUnsubRef.current=null;
+      setAuthUser(authUser||null);
+      setEmailVerified(Boolean(authUser?.emailVerified));
+      if(!authUser?.email){
+        setUserProfile(p=>({...p,email:"",hasAccount:false,isMember:false,membershipStatus:"inactive",wallet:0,callsUsed:0}));
+        return;
+      }
+      setAccountDraft(p=>({...p,email:authUser.email,password:""}));
+      memberUnsubRef.current=services.db.collection("members").doc(authUser.uid).onSnapshot(snapshot=>{
+        const data=snapshot.exists?snapshot.data():{};
+        const verified={
+          ...data,
+          name:data.displayName||data.name||"",
+          email:authUser.email,
+          hasAccount:true,
+          isMember:Boolean(data.isMember),
+          wallet:Number(data.wallet||0),
+          callsUsed:Number(data.callsUsed||0),
+          termsAccepted:Boolean(data.termsAcceptedAt)
+        };
+        setUserProfile(p=>({...p,...verified}));
+        setProfileDraft(p=>({...p,...verified}));
+        setCoins(verified.wallet);
+      },error=>setAccountNotice(error.message||"Could not sync your account."));
     });
-    return()=>unsubscribe?.();
+    return()=>{unsubscribe?.();memberUnsubRef.current?.();};
   },[]);
 
   useEffect(()=>{
     const params=new URLSearchParams(window.location.search);
     const paid=params.get("paid");
     if(!paid)return;
-    if(paid==="membership"){
-      const next={...userProfile,isMember:true};
-      setUserProfile(next);
-      setProfileDraft(p=>({...p,isMember:true}));
-      localStorage.setItem("charismaProfile",JSON.stringify(next));
-      setShowAccountSetup(true);
-      setAccessNotice("Membership activated. Create your Charisma account to keep up with gifts and Grace Points.");
-    }else{
-      const pack=GRACE_PACKS.find(p=>p.id===paid);
-      if(pack){
-        setCoins(c=>c+pack.points);
-        setAccessNotice(`${pack.label} added to your wallet.`);
-      }
-    }
+    setAccessNotice("Payment received. Stripe is verifying it now; your membership or Grace Points will appear automatically.");
     params.delete("paid");
     const clean=`${window.location.pathname}${params.toString()?`?${params.toString()}`:""}${window.location.hash}`;
     window.history.replaceState(null,"",clean||"/");
@@ -758,12 +775,12 @@ function App(){
 
   const isWoman=userProfile.role==="Woman";
   const isMember=Boolean(userProfile.isMember);
-  const accessExpired=Date.now()-revealAccess.windowStart>=ACCESS_RESET_MS;
-  const activeAccess=accessExpired?DEFAULT_ACCESS:revealAccess;
-  const freeCallsLeft=Math.max(0,FREE_REVEAL_LIMIT-activeAccess.callsUsed);
+  const callWindowMs=userProfile.callWindowStart?.toMillis?.()||0;
+  const verifiedCallsUsed=!callWindowMs||Date.now()-callWindowMs>=ACCESS_RESET_MS?0:Number(userProfile.callsUsed||0);
+  const freeCallsLeft=Math.max(0,FREE_REVEAL_LIMIT-verifiedCallsUsed);
   const hasUnlimitedAccess=isWoman||isMember;
   const canStartReveal=hasUnlimitedAccess||freeCallsLeft>0;
-  const profileComplete=Boolean(userProfile.name&&userProfile.age&&userProfile.city&&userProfile.role&&userProfile.identity&&Array.isArray(userProfile.interestedIn)&&userProfile.interestedIn.length);
+  const profileComplete=Boolean(authUser&&emailVerified&&userProfile.name&&Number(userProfile.age)>=18&&userProfile.city&&userProfile.role&&userProfile.identity&&Array.isArray(userProfile.interestedIn)&&userProfile.interestedIn.length&&userProfile.termsAccepted);
   const memberNeedsAccount=Boolean(userProfile.isMember&&!userProfile.hasAccount);
   const identityKey=value=>({
     "Woman":"woman",
@@ -801,7 +818,21 @@ function App(){
     });
   };
 
-  const saveProfile=()=>{
+  const saveProfile=async()=>{
+    const services=getFirebaseServices();
+    if(!authUser||!services?.db){
+      setAccountNotice("Create or sign in to your account before saving your profile.");
+      setShowAccountSetup(true);
+      return;
+    }
+    if(Number(profileDraft.age)<18){
+      setAccountNotice("Charisma is only available to adults age 18 and older.");
+      return;
+    }
+    if(!profileDraft.termsAccepted){
+      setAccountNotice("Confirm the 18+ Terms and Privacy agreement before saving.");
+      return;
+    }
     const next={
       ...userProfile,
       name:String(profileDraft.name||"").trim(),
@@ -812,21 +843,21 @@ function App(){
       interestedIn:Array.isArray(profileDraft.interestedIn)?profileDraft.interestedIn:[],
       orientation:profileDraft.orientation||"",
       intent:profileDraft.intent||"Real dates",
-      isMember:Boolean(profileDraft.isMember),
-      wallet:Number(profileDraft.wallet)||coins||1200
+      termsAccepted:true
     };
-    setUserProfile(next);
-    setCoins(next.wallet);
-    localStorage.setItem("charismaProfile",JSON.stringify(next));
-  };
-
-  const hashPassword=async(password,email)=>{
-    const text=`charisma-live:${email}:${password}`;
-    if(window.crypto?.subtle){
-      const bytes=await window.crypto.subtle.digest("SHA-256",new TextEncoder().encode(text));
-      return Array.from(new Uint8Array(bytes)).map(b=>b.toString(16).padStart(2,"0")).join("");
+    try{
+      await services.db.collection("members").doc(authUser.uid).set({
+        displayName:next.name,age:Number(next.age),city:next.city,role:next.role,identity:next.identity,
+        interestedIn:next.interestedIn,orientation:next.orientation,intent:next.intent,
+        termsAcceptedAt:window.firebase.firestore.FieldValue.serverTimestamp(),termsVersion:TERMS_VERSION,
+        updatedAt:window.firebase.firestore.FieldValue.serverTimestamp()
+      },{merge:true});
+      setUserProfile(next);
+      localStorage.setItem("charismaProfile",JSON.stringify({...next,isMember:false,wallet:0}));
+      setAccountNotice("Profile saved securely.");
+    }catch(error){
+      setAccountNotice(error.message||"Profile could not be saved.");
     }
-    return btoa(text);
   };
 
   const saveMemberAccount=async()=>{
@@ -836,45 +867,83 @@ function App(){
       setAccountNotice("Use a real email and a password with at least 6 characters.");
       return;
     }
-    setAccountNotice("Creating your account...");
+    setAccountNotice(authMode==="login"?"Signing in...":"Creating your account...");
     const services=getFirebaseServices();
-    let betaAccount={email,passwordHash:await hashPassword(password,email),createdAt:new Date().toISOString(),provider:"local"};
-    if(services){
-      try{
+    if(!services){setAccountNotice("Firebase is unavailable. Refresh and try again.");return;}
+    try{
+      if(authMode==="login"){
+        await services.auth.signInWithEmailAndPassword(email,password);
+        setAccountNotice("Signed in. Your verified profile and wallet are syncing.");
+      }else{
         const credential=await services.auth.createUserWithEmailAndPassword(email,password);
-        const authUser=credential.user;
-        await authUser.updateProfile({displayName:userProfile.name||profileDraft.name||"Charisma member"});
-        await services.db.collection("members").doc(authUser.uid).set({
-          email,
-          displayName:userProfile.name||profileDraft.name||"",
-          city:userProfile.city||profileDraft.city||"",
-          role:userProfile.role||profileDraft.role||"",
-          identity:userProfile.identity||profileDraft.identity||userProfile.role||profileDraft.role||"",
-          interestedIn:userProfile.interestedIn||profileDraft.interestedIn||[],
-          orientation:userProfile.orientation||profileDraft.orientation||"",
-          intent:userProfile.intent||profileDraft.intent||"Real dates",
-          wallet:coins,
-          isMember:true,
-          giftsSent:userProfile.giftsSent||[],
-          giftsReceived:userProfile.giftsReceived||[],
-          updatedAt:window.firebase.firestore.FieldValue.serverTimestamp(),
-          createdAt:window.firebase.firestore.FieldValue.serverTimestamp()
-        },{merge:true});
-        betaAccount={email,firebaseUid:authUser.uid,createdAt:new Date().toISOString(),provider:"firebase"};
-        setAuthProvider("firebase");
-      }catch(error){
-        setAccountNotice(error.message||"Firebase account setup failed. Try again.");
-        return;
+        const createdUser=credential.user;
+        await createdUser.updateProfile({displayName:profileDraft.name||"Charisma member"});
+        await services.db.collection("members").doc(createdUser.uid).set({
+          email,displayName:String(profileDraft.name||"").trim(),age:Number(profileDraft.age||0),city:String(profileDraft.city||"").trim(),
+          role:profileDraft.role||"",identity:profileDraft.identity||"",interestedIn:profileDraft.interestedIn||[],
+          orientation:profileDraft.orientation||"",intent:profileDraft.intent||"Real dates",
+          termsAcceptedAt:profileDraft.termsAccepted?window.firebase.firestore.FieldValue.serverTimestamp():null,
+          termsVersion:profileDraft.termsAccepted?TERMS_VERSION:"",wallet:1200,isMember:false,membershipStatus:"inactive",
+          callsUsed:0,callWindowStart:null,blockedUids:[],createdAt:window.firebase.firestore.FieldValue.serverTimestamp(),
+          updatedAt:window.firebase.firestore.FieldValue.serverTimestamp()
+        });
+        await createdUser.sendEmailVerification().catch(()=>{});
+        setAccountNotice("Account created. Your profile and 1,200 starting Grace Points are ready.");
       }
+      setAuthProvider("firebase");
+      setShowAccountSetup(false);
+    }catch(error){
+      setAccountNotice(error.message||"Account setup failed. Try again.");
     }
-    localStorage.setItem("charismaAccount",JSON.stringify(betaAccount));
-    const next={...userProfile,email,hasAccount:true,isMember:true};
-    setUserProfile(next);
-    setProfileDraft(p=>({...p,email,hasAccount:true,isMember:true}));
-    localStorage.setItem("charismaProfile",JSON.stringify(next));
-    setShowAccountSetup(false);
-    setAccountNotice(services?"Firebase account created.":"Account saved for this device.");
-    setAccessNotice(services?"Membership account created. Gifts and Grace Points are ready to sync with Firebase.":"Membership account saved. Gifts and Grace Points will stay with this profile on this device.");
+  };
+
+  const resetPassword=async()=>{
+    const email=String(accountDraft.email||authUser?.email||"").trim().toLowerCase();
+    if(!email.includes("@")){setAccountNotice("Enter your email first.");return;}
+    try{await getFirebaseServices().auth.sendPasswordResetEmail(email);setAccountNotice("Password reset email sent.");}
+    catch(error){setAccountNotice(error.message||"Password reset could not be sent.");}
+  };
+
+  const resendVerification=async()=>{
+    try{await authUser?.sendEmailVerification();setAccountNotice("Verification email sent. Check your inbox and spam folder.");}
+    catch(error){setAccountNotice(error.message||"Verification email could not be sent.");}
+  };
+
+  const refreshVerification=async()=>{
+    try{
+      await authUser?.reload();
+      const verified=Boolean(getFirebaseServices()?.auth?.currentUser?.emailVerified);
+      setEmailVerified(verified);
+      setAccountNotice(verified?"Email verified. You can match now.":"Email is not verified yet.");
+    }catch(error){setAccountNotice(error.message||"Verification status could not be refreshed.");}
+  };
+
+  const signOutAccount=async()=>{
+    await leaveMatchQueue();
+    await getFirebaseServices()?.auth?.signOut();
+    setAccountNotice("Signed out.");
+  };
+
+  const deleteAccount=async()=>{
+    if(!authUser||!window.confirm("Delete your Charisma account, profile, gifts, and matching data permanently?"))return;
+    try{
+      await callProtectedApi(ACCOUNT_API_URL,{action:"delete"});
+      localStorage.removeItem("charismaProfile");
+      localStorage.removeItem("charismaAccount");
+      await getFirebaseServices()?.auth?.signOut();
+      setUserProfile(DEFAULT_PROFILE);setProfileDraft(DEFAULT_PROFILE);setCoins(0);
+      setAccountNotice("Account deleted.");
+    }catch(error){setAccountNotice(error.message||"Account could not be deleted.");}
+  };
+
+  const callProtectedApi=async(url,payload)=>{
+    const current=getFirebaseServices()?.auth?.currentUser;
+    if(!current)throw new Error("Sign in is required.");
+    const token=await current.getIdToken();
+    const response=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`},body:JSON.stringify(payload)});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok||data.ok===false)throw new Error(data.error||"The secure request failed.");
+    return data;
   };
 
   const openStripeCheckout=(kind)=>{
@@ -883,7 +952,15 @@ function App(){
       setAccessNotice("Stripe checkout is ready in the app. Add your Stripe Payment Link to turn this on.");
       return;
     }
-    window.location.href=url;
+    if(!authUser?.email){
+      setAccountNotice("Create or sign in to your account before purchasing.");
+      setShowAccountSetup(true);
+      return;
+    }
+    const checkout=new URL(url);
+    checkout.searchParams.set("prefilled_email",authUser.email);
+    checkout.searchParams.set("client_reference_id",authUser.uid);
+    window.location.href=checkout.toString();
   };
 
   const upgradeMembership=()=>{
@@ -892,18 +969,11 @@ function App(){
 
   const recordRevealStart=()=>{
     setAccessNotice("");
-    if(hasUnlimitedAccess)return true;
-    const now=Date.now();
-    const current=now-activeAccess.windowStart>=ACCESS_RESET_MS?{windowStart:now,callsUsed:0}:activeAccess;
-    if(current.callsUsed>=FREE_REVEAL_LIMIT){
-      setRevealAccess(current);
-      localStorage.setItem("charismaRevealAccess",JSON.stringify(current));
+    if(!authUser){setAccessNotice("Sign in before starting a live match.");return false;}
+    if(!canStartReveal){
       setAccessNotice("Your free reveal access is done for today. Wait 24 hours or get membership for unlimited searching.");
       return false;
     }
-    const next={...current,callsUsed:current.callsUsed+1};
-    setRevealAccess(next);
-    localStorage.setItem("charismaRevealAccess",JSON.stringify(next));
     return true;
   };
 
@@ -1041,65 +1111,26 @@ function App(){
     setLocationStatus("confirmed");
   };
 
-  const makeRoomId=()=>`charisma-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
-
-  // ── Daily.co video config ──
-  const DAILY_DOMAIN="trycharisma.daily.co";
-  const DAILY_ROOM_WORKER="https://charisma-rooms.bthorpe99.workers.dev";
-  const buildJitsiUrl=room=>`https://meet.jit.si/${encodeURIComponent(room)}#config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false&interfaceConfig.SHOW_JITSI_WATERMARK=false`;
-  const createDailyRoom=async room=>{
-    if(!DAILY_ROOM_WORKER||DAILY_ROOM_WORKER.indexOf("PASTE_YOUR_WORKER")===0){return buildJitsiUrl(room);}
-    try{
-      const res=await fetch(DAILY_ROOM_WORKER,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({room})});
-      if(!res.ok)throw new Error("room create failed");
-      const data=await res.json();
-      return data.url||`https://${DAILY_DOMAIN}/${encodeURIComponent(room)}`;
-    }catch(err){return buildJitsiUrl(room);}
-  };
-
-  const toMatchRad=n=>n*Math.PI/180;
-  const matchMilesBetween=(a,b)=>{
-    if(!a||!b)return 0;
-    const R=3958.8;
-    const dLat=toMatchRad(b.lat-a.lat);
-    const dLng=toMatchRad(b.lng-a.lng);
-    const lat1=toMatchRad(a.lat);
-    const lat2=toMatchRad(b.lat);
-    const h=Math.sin(dLat/2)**2+Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)**2;
-    return 2*R*Math.asin(Math.min(1,Math.sqrt(h)));
-  };
-
   const getMatchUid=()=>{
-    const services=getFirebaseServices();
-    const uid=services?.auth?.currentUser?.uid;
-    if(uid)return uid;
-    let guest=localStorage.getItem("charismaGuestId");
-    if(!guest){
-      guest=`guest-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
-      localStorage.setItem("charismaGuestId",guest);
-    }
-    return guest;
+    return getFirebaseServices()?.auth?.currentUser?.uid||"";
   };
 
   const leaveMatchQueue=async()=>{
     matchUnsubRef.current?.();
     matchUnsubRef.current=null;
-    const services=getFirebaseServices();
-    if(!services?.db)return;
+    if(!authUser)return;
     try{
-      const uid=getMatchUid();
-      await services.db.collection("matchRequests").doc(uid).set({
-        status:"left",
-        updatedAt:window.firebase.firestore.FieldValue.serverTimestamp()
-      },{merge:true});
+      await callProtectedApi(MATCH_API_URL,{action:"leave"});
     }catch(err){}
   };
 
   const handleMatchedRequest=data=>{
-    const room=data.room||makeRoomId();
-    const callUrl=data.callUrl||buildJitsiUrl(room);
+    const room=data.room||"";
+    const callUrl=data.callUrl||"";
+    if(!callUrl){setMatchStatus("error");setMatchError("The secure video room was not available. Try again.");return;}
     setMatchRoom(room);
     setMatchCallUrl(callUrl);
+    setMatchedUserId(data.matchedUid||"");
     setMatchedProfileName(data.matchedName||"someone nearby");
     setMatchStatus("matched");
     setSafetyNotice(`Matched with ${data.matchedName||"someone nearby"}. Your real video room is loading inside Charisma.`);
@@ -1114,75 +1145,23 @@ function App(){
     setMatchRoom("");
     setMatchCallUrl("");
     setMatchedProfileName("");
-    if(!services?.db){
+    setMatchedUserId("");
+    if(!services?.db||!authUser){
       setMatchStatus("error");
-      setMatchError("Firebase is not ready yet. Refresh and try matching again.");
+      setMatchError("Sign in before starting a secure match.");
       setScreen("connecting");
       return false;
     }
     const uid=getMatchUid();
     const requestRef=services.db.collection("matchRequests").doc(uid);
-    const profileName=userProfile.name||"Guest";
     const myLocation=location?{lat:location.lat,lng:location.lng}:null;
     try{
       await leaveMatchQueue();
-      const waiting=await services.db.collection("matchRequests").where("status","==","waiting").limit(30).get();
-      const candidates=waiting.docs
-        .map(doc=>({id:doc.id,...doc.data()}))
-        .filter(item=>item.id!==uid&&item.language===language&&item.region===region)
-        .filter(item=>profileWantsCandidate(userProfile,item)&&profileWantsCandidate(item,userProfile))
-        .filter(item=>!myLocation||!item.location||matchMilesBetween(myLocation,item.location)<=50);
-      const candidate=candidates[0];
-      if(candidate){
-        const room=makeRoomId();
-        const callUrl=await createDailyRoom(room);
-        const matchId=`match-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
-        await services.db.runTransaction(async tx=>{
-          const candidateRef=services.db.collection("matchRequests").doc(candidate.id);
-          const candidateSnap=await tx.get(candidateRef);
-          if(!candidateSnap.exists||candidateSnap.data().status!=="waiting")throw new Error("That match was just taken. Searching again.");
-          const matchRef=services.db.collection("matches").doc(matchId);
-          const common={
-            matchId,
-            room,
-            callUrl,
-            language,
-            region,
-            status:"matched",
-            updatedAt:window.firebase.firestore.FieldValue.serverTimestamp()
-          };
-          tx.set(matchRef,{
-            id:matchId,
-            room,
-            callUrl,
-            language,
-            region,
-            status:"ready",
-            participants:[uid,candidate.id],
-            names:{[uid]:profileName,[candidate.id]:candidate.name||"Nearby match"},
-            createdAt:window.firebase.firestore.FieldValue.serverTimestamp()
-          });
-          tx.set(requestRef,{...common,uid,name:profileName,matchedName:candidate.name||"Nearby match"},{merge:true});
-          tx.set(candidateRef,{...common,matchedName:profileName},{merge:true});
-        });
-        handleMatchedRequest({room,callUrl,matchedName:candidate.name||"Nearby match"});
+      const result=await callProtectedApi(MATCH_API_URL,{action:"start",language,region,location:myLocation});
+      if(result.matched){
+        handleMatchedRequest(result);
         return true;
       }
-      await requestRef.set({
-        uid,
-        name:profileName,
-        role:userProfile.role,
-        identity:userProfile.identity||userProfile.role||"",
-        interestedIn:userProfile.interestedIn||[],
-        orientation:userProfile.orientation||"",
-        intent:userProfile.intent||"Real dates",
-        language,
-        region,
-        location:myLocation,
-        status:"waiting",
-        createdAt:window.firebase.firestore.FieldValue.serverTimestamp(),
-        updatedAt:window.firebase.firestore.FieldValue.serverTimestamp()
-      },{merge:true});
       matchUnsubRef.current=requestRef.onSnapshot(doc=>{
         const data=doc.data();
         if(data?.status==="matched")handleMatchedRequest(data);
@@ -1231,17 +1210,16 @@ function App(){
     goNext();
   };
 
-  const sendGift=g=>{
+  const sendGift=async g=>{
     if(coins<g.price)return;
-    setCoins(c=>c-g.price);
-    setSentGifts(p=>[...p,g]);
-    setUserProfile(p=>({
-      ...p,
-      giftsSent:[...(p.giftsSent||[]),{gift:g.name,price:g.price,to:profile.name,at:new Date().toISOString()}]
-    }));
-    setFloating(p=>[...p,{...g,key:Date.now()}]);
-    setPulseRing(true);
-    setTimeout(()=>setPulseRing(false),900);
+    if(!matchedUserId){setSafetyNotice("A verified live match is required before sending a gift.");return;}
+    try{
+      await callProtectedApi(MATCH_API_URL,{action:"sendGift",targetUid:matchedUserId,gift:g.name,price:g.price});
+      setSentGifts(p=>[...p,g]);
+      setFloating(p=>[...p,{...g,key:Date.now()}]);
+      setPulseRing(true);
+      setTimeout(()=>setPulseRing(false),900);
+    }catch(error){setSafetyNotice(error.message||"Gift could not be sent.");}
   };
 
   const nextUnblockedProfile=()=>{
@@ -1253,19 +1231,22 @@ function App(){
     return PROFILES[profileIndex];
   };
 
-  const reportProfile=()=>{
-    const report={profileId:profile.id,name:profile.name,at:new Date().toISOString()};
-    const reports=JSON.parse(localStorage.getItem("charismaReports")||"[]");
-    localStorage.setItem("charismaReports",JSON.stringify([report,...reports].slice(0,20)));
-    setSafetyNotice(`${profile.name} was reported. Our safety team will review this when moderation is connected.`);
+  const reportProfile=async()=>{
+    if(!matchedUserId){setSafetyNotice("No verified matched user is available to report.");return;}
+    try{
+      await callProtectedApi(MATCH_API_URL,{action:"report",targetUid:matchedUserId,matchId:matchRoom,reason:"Reported during live video call"});
+      setSafetyNotice(`${matchedProfileName||"This user"} was reported and blocked. The report is in the moderation queue.`);
+      endCall();
+    }catch(error){setSafetyNotice(error.message||"Report could not be submitted.");}
   };
 
-  const blockProfile=()=>{
-    const next=[...new Set([...blockedProfiles,profile.id])];
-    setBlockedProfiles(next);
-    localStorage.setItem("charismaBlockedProfiles",JSON.stringify(next));
-    setSafetyNotice(`${profile.name} was blocked and removed from your rotation.`);
-    goNext();
+  const blockProfile=async()=>{
+    if(!matchedUserId){setSafetyNotice("No verified matched user is available to block.");return;}
+    try{
+      await callProtectedApi(MATCH_API_URL,{action:"block",targetUid:matchedUserId,matchId:matchRoom});
+      setSafetyNotice(`${matchedProfileName||"This user"} was blocked and removed from future matching.`);
+      endCall();
+    }catch(error){setSafetyNotice(error.message||"Block could not be completed.");}
   };
 
   const endCall=()=>{
@@ -1420,30 +1401,43 @@ function App(){
                 </div>
               ))}
             </div>
-            {(memberNeedsAccount||showAccountSetup||userProfile.hasAccount)&&(
-              <div className="glass" style={{padding:"18px 18px",marginBottom:22,textAlign:"left",border:userProfile.hasAccount?"1px solid rgba(154,220,190,0.22)":"1px solid rgba(201,168,122,0.22)"}}>
-                <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.24em",color:userProfile.hasAccount?"rgba(154,220,190,0.68)":"rgba(201,168,122,0.68)",textTransform:"uppercase",marginBottom:10}}>Membership account</p>
-                {userProfile.hasAccount?(
+            <div className="glass" style={{padding:"18px 18px",marginBottom:22,textAlign:"left",border:authUser?"1px solid rgba(154,220,190,0.22)":"1px solid rgba(201,168,122,0.22)"}}>
+                <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.24em",color:authUser?"rgba(154,220,190,0.68)":"rgba(201,168,122,0.68)",textTransform:"uppercase",marginBottom:10}}>Secure account</p>
+                {authUser?(
                   <>
-                    <p style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted,lineHeight:1.5,marginBottom:12}}>{authProvider==="firebase"?"Your Firebase account is connected for cross-device login.":"Your account is connected to this profile for gifts and Grace Points on this device."}</p>
-                    <div style={{padding:"11px 12px",borderRadius:11,background:"rgba(154,220,190,0.08)",border:"1px solid rgba(154,220,190,0.16)",fontFamily:sans,fontSize:12,color:"rgba(223,247,247,0.82)",wordBreak:"break-all"}}>{userProfile.email||accountDraft.email}</div>
+                    <p style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted,lineHeight:1.5,marginBottom:12}}>Your profile, verified access, gifts, blocks, and Grace Points sync across devices.</p>
+                    <div style={{padding:"11px 12px",borderRadius:11,background:"rgba(154,220,190,0.08)",border:"1px solid rgba(154,220,190,0.16)",fontFamily:sans,fontSize:12,color:"rgba(223,247,247,0.82)",wordBreak:"break-all",marginBottom:10}}>{authUser.email}</div>
+                    {!emailVerified&&<div style={{padding:"10px 11px",borderRadius:10,background:"rgba(201,168,122,0.08)",border:"1px solid rgba(201,168,122,0.18)",marginBottom:10}}>
+                      <p style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:T.gold,lineHeight:1.4,marginBottom:8}}>Verify your email before entering live matching.</p>
+                      <div style={{display:"flex",gap:7}}>
+                        <button className="btn" onClick={resendVerification} style={{flex:1,padding:"8px 4px",borderRadius:9,fontSize:10,color:T.cream,background:"rgba(201,168,122,0.1)",border:"1px solid rgba(201,168,122,0.18)"}}>Resend email</button>
+                        <button className="btn" onClick={refreshVerification} style={{flex:1,padding:"8px 4px",borderRadius:9,fontSize:10,color:T.cream,background:"rgba(201,168,122,0.1)",border:"1px solid rgba(201,168,122,0.18)"}}>I verified</button>
+                      </div>
+                    </div>}
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:7}}>
+                      <button className="btn" onClick={resetPassword} style={{padding:"10px 4px",borderRadius:10,fontSize:10,color:T.cream,background:"rgba(196,146,138,0.08)",border:"1px solid rgba(196,146,138,0.16)"}}>Reset password</button>
+                      <button className="btn" onClick={signOutAccount} style={{padding:"10px 4px",borderRadius:10,fontSize:10,color:T.cream,background:"rgba(196,146,138,0.08)",border:"1px solid rgba(196,146,138,0.16)"}}>Sign out</button>
+                      <button className="btn" onClick={deleteAccount} style={{padding:"10px 4px",borderRadius:10,fontSize:10,color:"rgba(245,190,190,0.86)",background:"rgba(170,70,70,0.08)",border:"1px solid rgba(212,120,128,0.18)"}}>Delete account</button>
+                    </div>
                   </>
                 ):(
                   <>
-                    <p style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted,lineHeight:1.5,marginBottom:12}}>{authProvider==="firebase"?"Create your member login so gifts, Grace Points, and unlimited access can sync across devices.":"Create your member login so your gifts, Grace Points, and unlimited access belong to one profile."}</p>
+                    <p style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted,lineHeight:1.5,marginBottom:12}}>Create an account before matching so preferences, safety actions, and purchases belong to the right person.</p>
+                    <div style={{display:"flex",gap:7,marginBottom:10}}>
+                      {["signup","login"].map(mode=><button key={mode} className="btn" onClick={()=>setAuthMode(mode)} style={{flex:1,padding:"9px 6px",borderRadius:10,fontSize:11,color:authMode===mode?T.cream:T.muted,background:authMode===mode?"rgba(196,146,138,0.18)":"rgba(196,146,138,0.05)",border:"1px solid rgba(196,146,138,0.16)"}}>{mode==="signup"?"Create account":"Sign in"}</button>)}
+                    </div>
                     <div style={{display:"grid",gridTemplateColumns:"1fr",gap:8,marginBottom:10}}>
                       <input value={accountDraft.email} onChange={e=>setAccountDraft(p=>({...p,email:e.target.value}))} placeholder="Email" inputMode="email" autoComplete="email" style={{padding:"12px 12px",borderRadius:11,border:"1px solid rgba(196,146,138,0.14)",background:"rgba(18,13,16,0.42)",color:T.cream,fontFamily:sans,fontSize:13,outline:"none"}}/>
-                      <input value={accountDraft.password} onChange={e=>setAccountDraft(p=>({...p,password:e.target.value}))} placeholder="Password" type="password" autoComplete="new-password" style={{padding:"12px 12px",borderRadius:11,border:"1px solid rgba(196,146,138,0.14)",background:"rgba(18,13,16,0.42)",color:T.cream,fontFamily:sans,fontSize:13,outline:"none"}}/>
+                      <input value={accountDraft.password} onChange={e=>setAccountDraft(p=>({...p,password:e.target.value}))} placeholder="Password" type="password" autoComplete={authMode==="signup"?"new-password":"current-password"} style={{padding:"12px 12px",borderRadius:11,border:"1px solid rgba(196,146,138,0.14)",background:"rgba(18,13,16,0.42)",color:T.cream,fontFamily:sans,fontSize:13,outline:"none"}}/>
                     </div>
-                    <button className="btn" onClick={saveMemberAccount} style={{width:"100%",padding:"12px 10px",borderRadius:12,fontSize:12,color:T.cream,background:"rgba(201,168,122,0.12)",border:"1px solid rgba(201,168,122,0.28)",letterSpacing:"0.08em"}}>Create member account</button>
-                    <p style={{fontFamily:body,fontStyle:"italic",fontSize:11,color:"rgba(154,136,128,0.58)",lineHeight:1.45,marginTop:9,textAlign:"center"}}>{authProvider==="firebase"?"Firebase auth is connected. Stripe webhooks verify payments.":"This saves on this device until Firebase config is added."}</p>
+                    <button className="btn" onClick={saveMemberAccount} style={{width:"100%",padding:"12px 10px",borderRadius:12,fontSize:12,color:T.cream,background:"rgba(201,168,122,0.12)",border:"1px solid rgba(201,168,122,0.28)",letterSpacing:"0.08em"}}>{authMode==="signup"?"Create secure account":"Sign in"}</button>
+                    {authMode==="login"&&<button className="btn" onClick={resetPassword} style={{width:"100%",padding:"9px 4px",marginTop:7,borderRadius:10,fontSize:10,color:T.muted,background:"transparent",border:"none"}}>Forgot password?</button>}
                   </>
                 )}
                 {accountNotice&&(
                   <p style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:accountNotice.includes("saved")?"rgba(154,220,190,0.75)":"rgba(212,160,168,0.78)",lineHeight:1.45,marginTop:10,textAlign:"center"}}>{accountNotice}</p>
                 )}
-              </div>
-            )}
+            </div>
             <div className="glass" style={{padding:"18px 18px",marginBottom:22,textAlign:"left"}}>
               <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.24em",color:"rgba(196,146,138,0.45)",textTransform:"uppercase",marginBottom:12}}>Your profile</p>
               <div style={{display:"grid",gridTemplateColumns:"1fr 78px",gap:8,marginBottom:8}}>
@@ -1488,6 +1482,10 @@ function App(){
                   })}
                 </div>
               </div>
+              <label style={{display:"flex",alignItems:"flex-start",gap:9,padding:"11px 12px",marginBottom:12,borderRadius:11,background:"rgba(196,146,138,0.05)",border:"1px solid rgba(196,146,138,0.12)",cursor:"pointer"}}>
+                <input type="checkbox" checked={Boolean(profileDraft.termsAccepted)} onChange={e=>setProfileDraft(p=>({...p,termsAccepted:e.target.checked}))} style={{marginTop:2,accentColor:T.rose}}/>
+                <span style={{fontFamily:body,fontStyle:"italic",fontSize:12,color:T.muted,lineHeight:1.45}}>I confirm I am 18 or older and agree to the Terms and Privacy Policy.</span>
+              </label>
               <div style={{display:"flex",gap:8,alignItems:"center"}}>
                 <button className="btn" onClick={saveProfile} style={{flex:1,padding:"12px 10px",borderRadius:12,fontSize:12,color:T.cream,background:"rgba(196,146,138,0.14)",border:"1px solid rgba(196,146,138,0.25)",letterSpacing:"0.08em"}}>{profileComplete?"Update profile":"Save profile"}</button>
                 <div style={{padding:"10px 12px",borderRadius:12,background:"rgba(201,168,122,0.1)",border:"1px solid rgba(201,168,122,0.18)",fontFamily:sans,fontSize:12,color:T.gold,whiteSpace:"nowrap"}}>❧ {coins.toLocaleString()}</div>
