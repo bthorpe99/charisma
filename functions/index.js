@@ -10,6 +10,7 @@ admin.initializeApp();
 const db = admin.firestore();
 const stripeSecretKey = defineSecret("STRIPE_SECRET_KEY");
 const stripeWebhookSecret = defineSecret("STRIPE_WEBHOOK_SECRET");
+const dailyWorkerSecret = defineSecret("DAILY_WORKER_SECRET");
 const DAILY_ROOM_WORKER = "https://charisma-rooms.bthorpe99.workers.dev";
 const FREE_CALL_LIMIT = 4;
 const ACCESS_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -130,15 +131,19 @@ function canCall(member) {
 async function createVideoRoom(room) {
   const response = await fetch(DAILY_ROOM_WORKER, {
     method: "POST",
-    headers: {"Content-Type": "application/json"},
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${dailyWorkerSecret.value()}`
+    },
     body: JSON.stringify({room})
   });
   if (!response.ok) throw Object.assign(new Error("Secure video room could not be created."), {status: 503});
   const data = await response.json();
-  if (!data.url || !String(data.url).startsWith("https://trycharisma.daily.co/")) {
+  const urls = Array.isArray(data.urls) ? data.urls : [];
+  if (urls.length !== 2 || urls.some(url => !String(url).startsWith("https://trycharisma.daily.co/") || !String(url).includes("?t="))) {
     throw Object.assign(new Error("Video provider returned an invalid room."), {status: 503});
   }
-  return data.url;
+  return urls;
 }
 
 function profileFromMember(member) {
@@ -182,7 +187,7 @@ async function startMatch(uid, body) {
 
   for (const candidate of candidates) {
     const room = `charisma-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-    const callUrl = await createVideoRoom(room);
+    const [selfCallUrl, candidateCallUrl] = await createVideoRoom(room);
     const matchId = `match-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
     const candidateMemberRef = db.collection("members").doc(candidate.id);
     try {
@@ -197,13 +202,13 @@ async function startMatch(uid, body) {
           throw Object.assign(new Error("MATCH_UNAVAILABLE"), {code: "MATCH_TAKEN"});
         }
         const now = admin.firestore.FieldValue.serverTimestamp();
-        const common = {matchId, room, callUrl, language, region, status: "matched", updatedAt: now};
+        const common = {matchId, room, language, region, status: "matched", updatedAt: now};
         tx.set(db.collection("matches").doc(matchId), {
-          room, callUrl, language, region, status: "ready", participants: [uid, candidate.id],
+          room, language, region, status: "ready", participants: [uid, candidate.id],
           names: {[uid]: profile.name, [candidate.id]: candidate.name || "Nearby match"}, createdAt: now
         });
-        tx.set(requestRef, {...common, uid, matchedUid: candidate.id, name: profile.name, matchedName: candidate.name || "Nearby match"}, {merge: true});
-        tx.set(candidate.ref, {...common, matchedUid: uid, matchedName: profile.name}, {merge: true});
+        tx.set(requestRef, {...common, callUrl: selfCallUrl, uid, matchedUid: candidate.id, name: profile.name, matchedName: candidate.name || "Nearby match"}, {merge: true});
+        tx.set(candidate.ref, {...common, callUrl: candidateCallUrl, matchedUid: uid, matchedName: profile.name}, {merge: true});
 
         [[memberRef, selfMemberSnap.data()], [candidateMemberRef, candidateMemberSnap.data()]].forEach(([ref, data]) => {
           if (data.isMember || data.role === "Woman") return;
@@ -224,7 +229,7 @@ async function startMatch(uid, body) {
   return {matched: false};
 }
 
-exports.matchApi = onRequest({cors: false, invoker: "public", maxInstances: 20}, async (req, res) => {
+exports.matchApi = onRequest({cors: false, invoker: "public", maxInstances: 20, secrets: [dailyWorkerSecret]}, async (req, res) => {
   if (cors(req, res)) return;
   if (req.method !== "POST") return res.status(405).json({ok: false, error: "Method not allowed."});
   try {
