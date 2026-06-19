@@ -326,7 +326,7 @@ const LEGAL_CONTENT={
   },
   privacy:{
     title:"Privacy",
-    body:["Charisma stores account, profile, preferences, wallet, access, safety actions, and date-plan information needed to provide the service. You may delete your account from the Secure Account panel.","Camera and microphone media are used for the live room and are not recorded by Charisma. Precise location stays in your browser; matching stores only a coarse nearby area and removes stale queue entries automatically.","Payments are handled by Stripe. Charisma does not store your card number. Reports and transaction records may be retained as needed for safety, fraud prevention, refunds, and legal obligations."]
+    body:["Charisma stores account, profile, preferences, wallet, access, safety actions, and date-plan information needed to provide the service. You may delete your account from the Secure Account panel.","Camera and microphone media are used for the live room and are not recorded by Charisma. Your device location is sent securely to calculate a coarse nearby area; the precise coordinates are not stored, and stale queue entries are removed automatically.","Payments are handled by Stripe. Charisma does not store your card number. Reports and transaction records may be retained as needed for safety, fraud prevention, refunds, and legal obligations."]
   },
   terms:{
     title:"Terms",
@@ -1128,7 +1128,7 @@ function App(){
     const room=data.room||"";
     const callUrl=data.callUrl||"";
     if(!callUrl){setMatchStatus("error");setMatchError("The secure video room was not available. Try again.");return;}
-    setMatchRoom(room);
+    setMatchRoom(data.matchId||room);
     setMatchCallUrl(callUrl);
     setMatchedUserId(data.matchedUid||"");
     setMatchedProfileName(data.matchedName||"someone nearby");
@@ -1214,7 +1214,7 @@ function App(){
     if(coins<g.price)return;
     if(!matchedUserId){setSafetyNotice("A verified live match is required before sending a gift.");return;}
     try{
-      await callProtectedApi(MATCH_API_URL,{action:"sendGift",targetUid:matchedUserId,gift:g.name,price:g.price});
+      await callProtectedApi(MATCH_API_URL,{action:"sendGift",targetUid:matchedUserId,matchId:matchRoom,gift:g.name,price:g.price});
       setSentGifts(p=>[...p,g]);
       setFloating(p=>[...p,{...g,key:Date.now()}]);
       setPulseRing(true);

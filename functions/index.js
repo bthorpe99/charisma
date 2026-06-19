@@ -128,6 +128,17 @@ function canCall(member) {
   return accessState(member).callsUsed < FREE_CALL_LIMIT;
 }
 
+async function requireMatchedPair(uid, targetUid, matchId) {
+  if (!targetUid || targetUid === uid || !matchId) {
+    throw Object.assign(new Error("A valid live match is required."), {status: 400});
+  }
+  const match = await db.collection("matches").doc(matchId).get();
+  const participants = match.exists && Array.isArray(match.data().participants) ? match.data().participants : [];
+  if (!participants.includes(uid) || !participants.includes(targetUid)) {
+    throw Object.assign(new Error("That action is not connected to your match."), {status: 403});
+  }
+}
+
 async function createVideoRoom(room) {
   const response = await fetch(DAILY_ROOM_WORKER, {
     method: "POST",
@@ -245,7 +256,8 @@ exports.matchApi = onRequest({cors: false, invoker: "public", maxInstances: 20, 
     }
     if (action === "report" || action === "block") {
       const targetUid = cleanString(req.body?.targetUid, 128);
-      if (!targetUid || targetUid === user.uid) throw Object.assign(new Error("A valid matched user is required."), {status: 400});
+      const matchId = cleanString(req.body?.matchId, 128);
+      await requireMatchedPair(user.uid, targetUid, matchId);
       const memberRef = db.collection("members").doc(user.uid);
       const batch = db.batch();
       batch.set(memberRef, {blockedUids: admin.firestore.FieldValue.arrayUnion(targetUid), updatedAt: admin.firestore.FieldValue.serverTimestamp()}, {merge: true});
@@ -253,7 +265,7 @@ exports.matchApi = onRequest({cors: false, invoker: "public", maxInstances: 20, 
       if (action === "report") {
         const reportRef = db.collection("reports").doc();
         batch.set(reportRef, {
-          reporterUid: user.uid, targetUid, matchId: cleanString(req.body?.matchId, 128),
+          reporterUid: user.uid, targetUid, matchId,
           reason: cleanString(req.body?.reason || "User reported during live call", 500),
           status: "new", createdAt: admin.firestore.FieldValue.serverTimestamp()
         });
@@ -263,16 +275,18 @@ exports.matchApi = onRequest({cors: false, invoker: "public", maxInstances: 20, 
     }
     if (action === "sendGift") {
       const targetUid = cleanString(req.body?.targetUid, 128);
+      const matchId = cleanString(req.body?.matchId, 128);
       const gift = cleanString(req.body?.gift, 40);
       const price = Number(req.body?.price);
       if (!targetUid || !gift || GIFT_PRICES[gift] !== price) throw Object.assign(new Error("Invalid gift."), {status: 400});
+      await requireMatchedPair(user.uid, targetUid, matchId);
       const memberRef = db.collection("members").doc(user.uid);
       await db.runTransaction(async tx => {
         const snap = await tx.get(memberRef);
         if (!snap.exists || Number(snap.data().wallet || 0) < price) throw Object.assign(new Error("Not enough Grace Points."), {status: 409});
         tx.update(memberRef, {wallet: admin.firestore.FieldValue.increment(-price), updatedAt: admin.firestore.FieldValue.serverTimestamp()});
-        tx.set(memberRef.collection("giftsSent").doc(), {targetUid, gift, price, createdAt: admin.firestore.FieldValue.serverTimestamp()});
-        tx.set(db.collection("members").doc(targetUid).collection("giftsReceived").doc(), {fromUid: user.uid, gift, price, createdAt: admin.firestore.FieldValue.serverTimestamp()});
+        tx.set(memberRef.collection("giftsSent").doc(), {targetUid, matchId, gift, price, createdAt: admin.firestore.FieldValue.serverTimestamp()});
+        tx.set(db.collection("members").doc(targetUid).collection("giftsReceived").doc(), {fromUid: user.uid, matchId, gift, price, createdAt: admin.firestore.FieldValue.serverTimestamp()});
       });
       return res.json({ok: true});
     }
