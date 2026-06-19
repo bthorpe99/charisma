@@ -216,7 +216,7 @@ async function startMatch(uid, body) {
           tx.set(ref, {callsUsed: access.callsUsed + 1, callWindowStart: access.windowStart, updatedAt: now}, {merge: true});
         });
       });
-      return {matched: true, room, callUrl, matchedUid: candidate.id, matchedName: candidate.name || "Nearby match"};
+      return {matched: true, room, callUrl: selfCallUrl, matchedUid: candidate.id, matchedName: candidate.name || "Nearby match"};
     } catch (err) {
       if (err.code !== "MATCH_TAKEN") throw err;
     }
@@ -288,6 +288,10 @@ exports.accountApi = onRequest({cors: false, invoker: "public", maxInstances: 10
   try {
     const user = await requireUser(req);
     if (req.body?.action !== "delete") throw Object.assign(new Error("Unknown action."), {status: 400});
+    const matches = await db.collection("matches").where("participants", "array-contains", user.uid).limit(250).get();
+    const matchBatch = db.batch();
+    matches.docs.forEach(doc => matchBatch.delete(doc.ref));
+    if (!matches.empty) await matchBatch.commit();
     await Promise.all([
       db.recursiveDelete(db.collection("members").doc(user.uid)),
       db.collection("matchRequests").doc(user.uid).delete().catch(() => {})
