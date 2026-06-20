@@ -801,6 +801,40 @@ function App(){
   },[]);
 
   useEffect(()=>{
+    if(!authUser||emailVerified)return;
+    let active=true;
+    const syncVerification=async()=>{
+      try{
+        const current=getFirebaseServices()?.auth?.currentUser;
+        if(!current)return;
+        await current.reload();
+        if(!current.emailVerified)return;
+        await current.getIdToken(true);
+        if(active){
+          setAuthUser(current);
+          setEmailVerified(true);
+          setAccountNotice("Email verified. You can match now.");
+        }
+      }catch(error){}
+    };
+    const syncWhenVisible=()=>{
+      if(document.visibilityState==="visible")syncVerification();
+    };
+    syncVerification();
+    const poll=setInterval(syncVerification,4000);
+    window.addEventListener("focus",syncVerification);
+    window.addEventListener("pageshow",syncVerification);
+    document.addEventListener("visibilitychange",syncWhenVisible);
+    return()=>{
+      active=false;
+      clearInterval(poll);
+      window.removeEventListener("focus",syncVerification);
+      window.removeEventListener("pageshow",syncVerification);
+      document.removeEventListener("visibilitychange",syncWhenVisible);
+    };
+  },[authUser?.uid,emailVerified]);
+
+  useEffect(()=>{
     const params=new URLSearchParams(window.location.search);
     const paid=params.get("paid");
     if(!paid)return;
@@ -951,7 +985,10 @@ function App(){
   const refreshVerification=async()=>{
     try{
       await authUser?.reload();
-      const verified=Boolean(getFirebaseServices()?.auth?.currentUser?.emailVerified);
+      const current=getFirebaseServices()?.auth?.currentUser;
+      const verified=Boolean(current?.emailVerified);
+      if(verified)await current.getIdToken(true);
+      setAuthUser(current||null);
       setEmailVerified(verified);
       setAccountNotice(verified?"Email verified. You can match now.":"Email is not verified yet.");
     }catch(error){setAccountNotice(error.message||"Verification status could not be refreshed.");}
@@ -978,7 +1015,7 @@ function App(){
   const callProtectedApi=async(url,payload)=>{
     const current=getFirebaseServices()?.auth?.currentUser;
     if(!current)throw new Error("Sign in is required.");
-    const token=await current.getIdToken();
+    const token=await current.getIdToken(true);
     const response=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`},body:JSON.stringify(payload)});
     const data=await response.json().catch(()=>({}));
     if(!response.ok||data.ok===false)throw new Error(data.error||"The secure request failed.");
