@@ -2,4 +2,10 @@ name = "charisma-rooms"
 main = "src/index.js"
 compatibility_date = "2026-06-18"
 workers_dev = true
+preview_urls = false
 
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
