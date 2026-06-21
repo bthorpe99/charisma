@@ -723,6 +723,8 @@ function App(){
   const blurRef=useRef(null);
   const videoRef=useRef(null);
   const streamRef=useRef(null);
+  const matchPollRef=useRef(null);
+  const matchAttemptRef=useRef(false);
   const matchUnsubRef=useRef(null);
   const memberUnsubRef=useRef(null);
 
@@ -746,7 +748,10 @@ function App(){
     return()=>clearTimeout(t);
   },[revealMsg]);
 
-  useEffect(()=>()=>{matchUnsubRef.current?.();},[]);
+  useEffect(()=>()=>{
+    matchUnsubRef.current?.();
+    if(matchPollRef.current)clearInterval(matchPollRef.current);
+  },[]);
 
   const attachCameraStream=()=>{
     if(videoRef.current&&streamRef.current){
@@ -1191,7 +1196,14 @@ function App(){
     return getFirebaseServices()?.auth?.currentUser?.uid||"";
   };
 
+  const stopMatchPolling=()=>{
+    if(matchPollRef.current)clearInterval(matchPollRef.current);
+    matchPollRef.current=null;
+    matchAttemptRef.current=false;
+  };
+
   const leaveMatchQueue=async()=>{
+    stopMatchPolling();
     matchUnsubRef.current?.();
     matchUnsubRef.current=null;
     if(!authUser)return;
@@ -1201,6 +1213,7 @@ function App(){
   };
 
   const handleMatchedRequest=data=>{
+    stopMatchPolling();
     const room=data.room||"";
     const callUrl=data.callUrl||"";
     if(!callUrl){setMatchStatus("error");setMatchError("The secure video room was not available. Try again.");return;}
@@ -1245,6 +1258,18 @@ function App(){
         setMatchStatus("error");
         setMatchError(err?.message||"Matching could not connect. Try again.");
       });
+      matchPollRef.current=setInterval(async()=>{
+        if(matchAttemptRef.current)return;
+        matchAttemptRef.current=true;
+        try{
+          const next=await callProtectedApi(MATCH_API_URL,{action:"start",language,region,location:myLocation});
+          if(next.matched)handleMatchedRequest(next);
+        }catch(err){
+          setMatchError(err?.message||"Matching is reconnecting. Keep this screen open.");
+        }finally{
+          matchAttemptRef.current=false;
+        }
+      },5000);
       setSafetyNotice("Searching nearby now. Keep this screen open while Charisma looks for someone close.");
       setScreen("connecting");
       return true;
