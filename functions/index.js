@@ -106,6 +106,8 @@ function coarseArea(location) {
   const lat = Number(location && location.lat);
   const lng = Number(location && location.lng);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  // Some desktop browsers report Null Island when location is unavailable.
+  if (Math.abs(lat) < 0.0001 && Math.abs(lng) < 0.0001) return null;
   return {latBucket: Math.round(lat * 10), lngBucket: Math.round(lng * 10)};
 }
 
@@ -195,6 +197,14 @@ async function startMatch(uid, body) {
     .filter(item => !blocked.has(item.id) && !(item.blockedUids || []).includes(uid))
     .filter(item => nearbyArea(area, item.area))
     .filter(item => compatible(profile, item));
+
+  logger.info("match_queue_attempt", {
+    waitingCount: waiting.size,
+    candidateCount: candidates.length,
+    hasUsableLocation: Boolean(area),
+    language,
+    region
+  });
 
   for (const candidate of candidates) {
     const room = `charisma-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
