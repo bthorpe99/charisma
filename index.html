@@ -326,7 +326,7 @@ const LEGAL_CONTENT={
   },
   privacy:{
     title:"Privacy",
-    body:["Charisma stores account, profile, preferences, wallet, access, safety actions, and date-plan information needed to provide the service. You may delete your account from the Secure Account panel.","Camera and microphone media are used for the live room and are not recorded by Charisma. Your device location is sent securely to calculate a coarse nearby area; the precise coordinates are not stored, and stale queue entries are removed automatically.","Payments are handled by Stripe. Charisma does not store your card number. Reports and transaction records may be retained as needed for safety, fraud prevention, refunds, and legal obligations."]
+    body:["Charisma stores account, profile, preferences, wallet, access, safety actions, and date-plan information needed to provide the service. You may delete your account from the Secure Account panel.","Camera and microphone media are used for private live video and are not recorded by Charisma. Your device location is sent securely to calculate a coarse nearby area; the precise coordinates are not stored, and stale queue entries are removed automatically.","Payments are handled by Stripe. Charisma does not store your card number. Reports and transaction records may be retained as needed for safety, fraud prevention, refunds, and legal obligations."]
   },
   terms:{
     title:"Terms",
@@ -446,21 +446,34 @@ const DailyLiveRoom=({url,name,matchedName,blurAmount,activeQuestion,activeQuest
   useEffect(()=>{
     if(!url||!window.DailyIframe)return;
     let active=true;
+    let joinTimer=null;
     const call=window.DailyIframe.createCallObject({subscribeToTracksAutomatically:true});
     callRef.current=call;
     const update=()=>{if(active)setParticipants({...call.participants()});};
+    const joined=()=>{
+      if(joinTimer)clearTimeout(joinTimer);
+      setStatus("joined");
+      update();
+      Promise.allSettled([call.setLocalVideo(true),call.setLocalAudio(true)]).then(update);
+    };
     call
-      .on("joined-meeting",()=>{setStatus("joined");update();})
+      .on("joined-meeting",joined)
       .on("participant-joined",update)
       .on("participant-updated",update)
       .on("participant-left",update)
       .on("track-started",update)
       .on("track-stopped",update)
+      .on("camera-error",()=>setStatus("permissions"))
       .on("error",()=>setStatus("error"))
       .on("left-meeting",()=>setStatus("left"));
-    call.join({url,userName:name||"Guest"}).catch(()=>setStatus("error"));
+    const parsedUrl=new URL(url);
+    const token=parsedUrl.searchParams.get("t")||"";
+    parsedUrl.search="";
+    joinTimer=setTimeout(()=>{if(active)setStatus("slow");},12000);
+    call.join({url:parsedUrl.toString(),token,userName:name||"Guest"}).catch(()=>setStatus("error"));
     return()=>{
       active=false;
+      if(joinTimer)clearTimeout(joinTimer);
       call.leave().catch(()=>{}).finally(()=>call.destroy().catch(()=>{}));
       callRef.current=null;
     };
@@ -498,7 +511,7 @@ const DailyLiveRoom=({url,name,matchedName,blurAmount,activeQuestion,activeQuest
       <audio ref={audioRef} autoPlay playsInline/>
       {!featuredParticipant&&(
         <div style={{position:"absolute",inset:0,zIndex:1,display:"flex",alignItems:"center",justifyContent:"center",background:"linear-gradient(175deg,rgba(28,20,25,0.96),rgba(18,13,16,0.98))",fontFamily:body,fontStyle:"italic",fontSize:15,color:T.muted,textAlign:"center",padding:30}}>
-          {status==="error"?"Video room could not connect. Refresh and try again.":"Opening the real video room..."}
+          {status==="error"?"Video could not connect. End this call and try again.":status==="permissions"?"Allow camera and microphone access to connect.":status==="slow"?"Still connecting. Keep Charisma open.":"Connecting you now..."}
         </div>
       )}
       <div style={{position:"absolute",top:14,left:14,right:14,zIndex:5,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,pointerEvents:"none"}}>
@@ -507,7 +520,7 @@ const DailyLiveRoom=({url,name,matchedName,blurAmount,activeQuestion,activeQuest
           REAL MATCH
         </div>
         <div style={{padding:"6px 10px",borderRadius:100,background:"rgba(18,13,16,0.72)",backdropFilter:"blur(8px)",border:"1px solid rgba(122,181,201,0.2)",fontFamily:sans,fontSize:10,color:"rgba(223,247,247,0.78)",maxWidth:170,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
-          {remoteParticipant?matchedName||"Nearby match":"Waiting for video"}
+          {remoteParticipant?matchedName||"Nearby match":"Connecting..."}
         </div>
       </div>
       <div key={activeQuestionIndex} style={{position:"absolute",top:58,left:18,right:112,padding:"12px 14px",borderRadius:15,background:"rgba(18,13,16,0.68)",backdropFilter:"blur(14px)",border:"1px solid rgba(196,146,138,0.16)",boxShadow:"0 10px 34px rgba(0,0,0,0.35)",animation:"fadeUp 0.35s ease",zIndex:5,pointerEvents:"none"}}>
@@ -619,7 +632,7 @@ const CharismaFooter=({onStart,onLegal})=>{
           <div style={{width:38,height:38,borderRadius:"50%",background:"#060606",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:serif,fontSize:21}}>❧</div>
           <div>
             <h2 style={{fontSize:25,lineHeight:1.08,fontWeight:500,letterSpacing:"-0.03em",margin:0}}>Meet, Reveal, Plan</h2>
-            <p style={{fontSize:13,lineHeight:1.55,color:"rgba(6,6,6,0.58)",marginTop:7,maxWidth:330}}>Private live rooms for chemistry, safer setup, and intentional first-date plans.</p>
+            <p style={{fontSize:13,lineHeight:1.55,color:"rgba(6,6,6,0.58)",marginTop:7,maxWidth:330}}>Instant private video for chemistry, safer setup, and intentional first-date plans.</p>
           </div>
         </div>
         <div style={{display:"flex",flexWrap:"wrap",gap:10}}>
@@ -1137,7 +1150,7 @@ function App(){
     try{
       const stream=await navigator.mediaDevices.getUserMedia({
         video:{facingMode:"user",width:{ideal:640},height:{ideal:960}},
-        audio:false
+        audio:true
       });
       if(streamRef.current&&streamRef.current!==stream){
         streamRef.current.getTracks().forEach(track=>track.stop());
@@ -1216,14 +1229,15 @@ function App(){
     stopMatchPolling();
     const room=data.room||"";
     const callUrl=data.callUrl||"";
-    if(!callUrl){setMatchStatus("error");setMatchError("The secure video room was not available. Try again.");return;}
+    if(!callUrl){setMatchStatus("error");setMatchError("The secure video connection was not available. Try again.");return;}
+    // Release the preview tracks before Daily takes control, especially on iOS Safari.
+    stopCamera();
     setMatchRoom(data.matchId||room);
     setMatchCallUrl(callUrl);
     setMatchedUserId(data.matchedUid||"");
     setMatchedProfileName(data.matchedName||"someone nearby");
     setMatchStatus("matched");
-    setSafetyNotice(`Matched with ${data.matchedName||"someone nearby"}. Your real video room is loading inside Charisma.`);
-    stopCamera();
+    setSafetyNotice(`Matched with ${data.matchedName||"someone nearby"}. Connecting your live video now.`);
     setScreen("call");
   };
 
