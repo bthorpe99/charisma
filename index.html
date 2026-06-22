@@ -1570,7 +1570,7 @@ function App(){
                 <div style={{fontFamily:body,fontStyle:"italic",fontSize:13,color:T.muted,marginBottom:8}}>Choose your access type</div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8}}>
                   {["Man","Woman"].map(role=>(
-                    <button key={role} className="btn" onClick={()=>setProfileDraft(p=>({...p,role}))} style={{padding:"11px 8px",borderRadius:11,fontSize:12,background:profileDraft.role===role?"rgba(196,146,138,0.18)":"rgba(196,146,138,0.06)",border:profileDraft.role===role?"1px solid rgba(196,146,138,0.5)":"1px solid rgba(196,146,138,0.12)",color:profileDraft.role===role?T.cream:T.muted}}>{role==="Woman"?"I'm a woman - free":"I'm a man"}</button>
+                    <button key={role} className="btn" onClick={()=>setProfileDraft(p=>({...p,role,identity:!p.identity||["Man","Woman"].includes(p.identity)?role:p.identity}))} style={{padding:"11px 8px",borderRadius:11,fontSize:12,background:profileDraft.role===role?"rgba(196,146,138,0.18)":"rgba(196,146,138,0.06)",border:profileDraft.role===role?"1px solid rgba(196,146,138,0.5)":"1px solid rgba(196,146,138,0.12)",color:profileDraft.role===role?T.cream:T.muted}}>{role==="Woman"?"I'm a woman - free":"I'm a man"}</button>
                   ))}
                 </div>
                 <p style={{fontFamily:body,fontStyle:"italic",fontSize:11,color:"rgba(154,136,128,0.58)",lineHeight:1.45,marginTop:7}}>This only controls beta access. Your dating identity is separate.</p>
