@@ -373,11 +373,27 @@ const LEGAL_CONTENT={
   },
   terms:{
     title:"Terms",
-    body:["By using Charisma, you confirm that you are at least 18 years old, will provide truthful profile information, and will follow the safety rules and community standards.","Grace Points and membership access are connected to your verified account. Payments, renewals, cancellations, and refunds are processed through Stripe. Refunded digital benefits may be removed from the account.","Charisma may suspend accounts that create safety risks, abuse payments, evade blocks, or misuse live video. Beta features may change while the service improves."]
+    body:["By using Charisma, you confirm that you are at least 18 years old, will provide truthful profile information, and will follow the safety rules and community standards.","Human trafficking, sexual exploitation, prostitution, non-consensual sexual content, grooming, and aiding, advertising, arranging, or encouraging abuse are strictly prohibited. Charisma will suspend reported accounts and may preserve and disclose relevant records when legally required.","Grace Points and membership access are connected to your verified account. Payments, renewals, cancellations, and refunds are processed through Stripe. Refunded digital benefits may be removed from the account.","Charisma may suspend accounts that create safety risks, abuse payments, evade blocks, or misuse live video. Beta features may change while the service improves."]
+  },
+  acceptableUse:{
+    title:"Acceptable Use",
+    body:["Charisma may be used only by adults age 18 or older for lawful, consensual dating and social connection.","Users may not engage in human trafficking, sexual exploitation, prostitution, grooming, coercion, non-consensual sexual content, harassment, threats, hate, scams, impersonation, stalking, extortion, illegal activity, or the sale or promotion of regulated goods or services.","Users may not aid, advertise, arrange, encourage, or conceal abuse or exploitation. Reported violations may result in immediate suspension, removal, preservation of relevant records, and referral to appropriate authorities when required by law."]
+  },
+  pricing:{
+    title:"Pricing",
+    body:["Charisma Membership is $9.99 per month and renews monthly until canceled. Membership provides unlimited searching while active.","Grace Points are optional one-time purchases: 500 points for $4.99, 1,200 points for $9.99, or 3,000 points for $19.99. Grace Points are digital credits used for gifts inside Charisma and have no cash value.","Prices are shown in U.S. dollars. Stripe displays the final amount before payment. Charisma will provide notice before materially changing an active subscription price."]
+  },
+  refunds:{
+    title:"Refund Policy",
+    body:["You may cancel a Charisma Membership at any time to stop future renewals. Cancellation does not automatically refund the current billing period.",`For duplicate charges, unauthorized payments, technical failures, or a membership renewal you did not intend to use, contact ${SUPPORT_EMAIL} within 7 days of the charge. Eligible refunds are returned to the original payment method through Stripe.`,"Used Grace Points and completed digital gifts are generally non-refundable. Unused points may be refunded when required by law or when Charisma confirms a duplicate charge or service failure. Refunded benefits may be removed from the account."]
+  },
+  lawEnforcement:{
+    title:"Law Enforcement",
+    body:[`Law-enforcement and government agencies may send preservation requests, subpoenas, court orders, and emergency disclosure requests to ${SUPPORT_EMAIL}. Use the subject line “Law Enforcement Request” and include agency identification, contact information, legal authority, the relevant account identifier, and the records and date range requested.`,"Charisma reviews requests for legal validity and appropriate scope. We may preserve or disclose account records when required by applicable law and may notify the affected user unless prohibited by law or an emergency creates a risk of harm.","For an immediate threat to life or physical safety, contact local emergency services first and clearly identify the emergency in the request."]
   },
   support:{
     title:"Support",
-    body:[`For help, safety issues, payment questions, or feedback, contact ${SUPPORT_EMAIL}. Include the device, browser, and what happened so we can troubleshoot faster.`]
+    body:[`Charisma customer support and business contact: ${SUPPORT_EMAIL}. For help, safety issues, payment questions, accessibility requests, or feedback, include the device, browser, account email, and what happened so we can respond and troubleshoot faster.`]
   }
 };
 const BACKGROUND_VIDEOS=[
@@ -667,7 +683,7 @@ const CharismaButton=({children,variant="primary",onClick,style={}})=>(
 
 const CharismaFooter=({onStart,onLegal})=>{
   const menuA=["Live Reveal","Guided Questions","Grace Gifts","Date Planning"];
-  const menuB=[["Safety","safety"],["Privacy","privacy"],["Terms","terms"],["Support","support"]];
+  const menuB=[["Safety","safety"],["Privacy","privacy"],["Terms","terms"],["Acceptable Use","acceptableUse"],["Pricing","pricing"],["Refunds","refunds"],["Law Enforcement","lawEnforcement"],["Contact","support"]];
   return(
     <div style={{animation:"fadeUp 0.7s ease",marginTop:26,marginBottom:28,background:"rgba(255,255,240,0.94)",backdropFilter:"blur(18px)",borderRadius:28,padding:"24px 22px",boxShadow:"0 18px 60px rgba(0,0,0,0.28)",border:"1px solid rgba(255,255,255,0.28)",fontFamily:"'Geist','Jost',sans-serif",color:"#060606",textAlign:"left"}}>
       <div style={{display:"grid",gridTemplateColumns:"1fr",gap:22}}>
@@ -769,7 +785,10 @@ function App(){
   const [matchedProfileName,setMatchedProfileName]=useState("");
   const [matchedUserId,setMatchedUserId]=useState("");
   const [backgroundVideoIndex,setBackgroundVideoIndex]=useState(0);
-  const [legalModal,setLegalModal]=useState(null);
+  const [legalModal,setLegalModal]=useState(()=>{
+    const policy=new URLSearchParams(window.location.search).get("policy");
+    return LEGAL_CONTENT[policy]?policy:null;
+  });
   const [safetyNotice,setSafetyNotice]=useState("");
   const [blockedProfiles,setBlockedProfiles]=useState(()=>{
     try{return JSON.parse(localStorage.getItem("charismaBlockedProfiles")||"[]");}
@@ -1486,7 +1505,7 @@ function App(){
 
       {legalModal&&(
         <div style={{position:"fixed",inset:0,zIndex:500,background:"rgba(18,13,16,0.76)",backdropFilter:"blur(12px)",display:"flex",alignItems:"center",justifyContent:"center",padding:22}} onClick={()=>setLegalModal(null)}>
-          <div className="glass" onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:420,padding:"24px 22px",boxShadow:"0 22px 80px rgba(0,0,0,0.58)"}}>
+          <div className="glass" onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:520,maxHeight:"82vh",overflowY:"auto",padding:"24px 22px",boxShadow:"0 22px 80px rgba(0,0,0,0.58)"}}>
             <div style={{display:"flex",justifyContent:"space-between",gap:16,alignItems:"center",marginBottom:14}}>
               <h2 style={{fontFamily:serif,fontSize:30,fontWeight:300,color:T.cream,margin:0}}>{LEGAL_CONTENT[legalModal].title}</h2>
               <button className="btn" onClick={()=>setLegalModal(null)} style={{width:34,height:34,borderRadius:"50%",background:"rgba(196,146,138,0.1)",border:"1px solid rgba(196,146,138,0.18)",color:T.cream,fontSize:18}}>×</button>
