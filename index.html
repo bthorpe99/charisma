@@ -88,7 +88,7 @@ class AppErrorBoundary extends React.Component{
   }
 }
 
-const REVEAL_SECONDS=60;
+const REVEAL_SECONDS=30;
 const INITIAL_REVEAL_BLUR=22;
 const REVEAL_BLUR_STEP=INITIAL_REVEAL_BLUR/REVEAL_SECONDS;
 
@@ -1547,7 +1547,7 @@ function App(){
               <p style={{fontFamily:sans,fontSize:10,letterSpacing:"0.28em",color:"rgba(196,146,138,0.45)",textTransform:"uppercase",marginBottom:18}}>The experience</p>
               {[
                 ["❧","Instant connection","Drop into a live call — no waiting, no accepting"],
-                ["◑","The slow reveal","One minute of voice & energy before they unblur"],
+                ["◑","The slow reveal","30 seconds of voice & energy before they unblur"],
                 ["🌸","Send a grace gift","A gentle way to show you're feeling the connection"],
                 ["📍","Book the evening","After a match, reserve a table together in the app"],
               ].map(([ic,ttl,desc])=>(
