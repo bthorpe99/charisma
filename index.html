@@ -14,6 +14,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 <script src="https://unpkg.com/@daily-co/daily-js"></script>
+<script src="./monitor.bundle.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=swap');
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -44,6 +45,48 @@
 <div id="root"></div>
 <script type="text/babel">
 const {useState,useEffect,useRef}=React;
+
+const SENTRY_DSN="https://1338e7fcb7f9fda6784671bdb57348a3@o4511607097262080.ingest.us.sentry.io/4511607156768768";
+if(SENTRY_DSN&&window.Sentry){
+  Sentry.init({
+    dsn:SENTRY_DSN,
+    environment:location.hostname==="trycharisma.live"?"production":"development",
+    release:"charisma@2026.06.21",
+    sendDefaultPii:false,
+    tracesSampleRate:0,
+    beforeSend(event){
+      delete event.user;
+      delete event.request;
+      return event;
+    },
+    beforeBreadcrumb(crumb){
+      if(crumb.data){
+        ["from","to","url"].forEach(key=>{
+          if(typeof crumb.data[key]==="string") crumb.data[key]=crumb.data[key].split(/[?#]/)[0];
+        });
+      }
+      return crumb;
+    }
+  });
+}
+
+class AppErrorBoundary extends React.Component{
+  constructor(props){super(props);this.state={failed:false};}
+  static getDerivedStateFromError(){return {failed:true};}
+  componentDidCatch(error,info){
+    if(window.Sentry&&SENTRY_DSN) Sentry.captureException(error,{contexts:{react:{componentStack:info.componentStack}}});
+  }
+  render(){
+    if(!this.state.failed) return this.props.children;
+    return <main style={{minHeight:"100vh",display:"grid",placeItems:"center",padding:24,background:"#120d10",color:"#f3e8e1",textAlign:"center"}}>
+      <div style={{maxWidth:420}}>
+        <p style={{fontFamily:"'Cormorant Garamond',serif",fontSize:32,marginBottom:12}}>Charisma needs a quick refresh.</p>
+        <p style={{opacity:.72,lineHeight:1.6,marginBottom:20}}>The issue was reported automatically. Your password and private profile details were not included.</p>
+        <button className="btn" onClick={()=>location.reload()} style={{padding:"13px 22px",borderRadius:10,background:"#c4928a",color:"white"}}>Refresh Charisma</button>
+      </div>
+    </main>;
+  }
+}
 
 const REVEAL_SECONDS=60;
 const INITIAL_REVEAL_BLUR=22;
@@ -1964,7 +2007,7 @@ function App(){
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+ReactDOM.createRoot(document.getElementById("root")).render(<AppErrorBoundary><App/></AppErrorBoundary>);
 </script>
 </body>
 </html>

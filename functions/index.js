@@ -11,6 +11,7 @@ const db = admin.firestore();
 const stripeSecretKey = defineSecret("STRIPE_SECRET_KEY");
 const stripeWebhookSecret = defineSecret("STRIPE_WEBHOOK_SECRET");
 const dailyWorkerSecret = defineSecret("DAILY_WORKER_SECRET");
+const sentryDsn = defineSecret("SENTRY_DSN");
 const DAILY_ROOM_WORKER = "https://charisma-rooms.bthorpe99.workers.dev";
 const FREE_CALL_LIMIT = 4;
 const ACCESS_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -81,9 +82,35 @@ async function requireUser(req) {
   return admin.auth().verifyIdToken(header.slice(7));
 }
 
-function apiError(res, err) {
+let sentryReady = false;
+let Sentry;
+
+function initSentry() {
+  if (sentryReady) return;
+  const dsn = sentryDsn.value();
+  if (!dsn) return;
+  Sentry = require("@sentry/node");
+  Sentry.init({
+    dsn,
+    environment: "production",
+    release: process.env.K_REVISION || "charisma-functions",
+    sendDefaultPii: false,
+    tracesSampleRate: 0
+  });
+  sentryReady = true;
+}
+
+async function reportError(err, surface) {
+  logger.error(err);
+  initSentry();
+  if (!sentryReady) return;
+  Sentry.captureException(err, {tags: {surface}});
+  await Sentry.flush(2000);
+}
+
+async function apiError(res, err, surface) {
   const status = err.status || 500;
-  if (status >= 500) logger.error(err);
+  if (status >= 500) await reportError(err, surface);
   res.status(status).json({ok: false, error: status >= 500 ? "Something went wrong. Try again." : err.message});
 }
 
@@ -250,7 +277,7 @@ async function startMatch(uid, body) {
   return {matched: false};
 }
 
-exports.matchApi = onRequest({cors: false, invoker: "public", maxInstances: 20, secrets: [dailyWorkerSecret]}, async (req, res) => {
+exports.matchApi = onRequest({cors: false, invoker: "public", maxInstances: 20, secrets: [dailyWorkerSecret, sentryDsn]}, async (req, res) => {
   if (cors(req, res)) return;
   if (req.method !== "POST") return res.status(405).json({ok: false, error: "Method not allowed."});
   try {
@@ -302,11 +329,11 @@ exports.matchApi = onRequest({cors: false, invoker: "public", maxInstances: 20, 
     }
     throw Object.assign(new Error("Unknown action."), {status: 400});
   } catch (err) {
-    apiError(res, err);
+    await apiError(res, err, "matchApi");
   }
 });
 
-exports.accountApi = onRequest({cors: false, invoker: "public", maxInstances: 10}, async (req, res) => {
+exports.accountApi = onRequest({cors: false, invoker: "public", maxInstances: 10, secrets: [sentryDsn]}, async (req, res) => {
   if (cors(req, res)) return;
   if (req.method !== "POST") return res.status(405).json({ok: false, error: "Method not allowed."});
   try {
@@ -323,7 +350,7 @@ exports.accountApi = onRequest({cors: false, invoker: "public", maxInstances: 10
     await admin.auth().deleteUser(user.uid);
     res.json({ok: true});
   } catch (err) {
-    apiError(res, err);
+    await apiError(res, err, "accountApi");
   }
 });
 
@@ -387,7 +414,7 @@ async function updateSubscription(subscription) {
   }, {merge: true});
 }
 
-exports.stripeWebhook = onRequest({cors: false, invoker: "public", secrets: [stripeSecretKey, stripeWebhookSecret]}, async (req, res) => {
+exports.stripeWebhook = onRequest({cors: false, invoker: "public", secrets: [stripeSecretKey, stripeWebhookSecret, sentryDsn]}, async (req, res) => {
   if (req.method !== "POST") return res.status(405).send("Method Not Allowed");
   let event;
   try {
@@ -431,16 +458,21 @@ exports.stripeWebhook = onRequest({cors: false, invoker: "public", secrets: [str
     }
     res.json({received: true});
   } catch (err) {
-    logger.error("Stripe event processing failed", err);
+    await reportError(err, "stripeWebhook");
     res.status(500).send("Webhook processing failed");
   }
 });
 
-exports.cleanupMatchQueue = onSchedule("every 5 minutes", async () => {
-  const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - QUEUE_TTL_MS);
-  const stale = await db.collection("matchRequests").where("updatedAt", "<", cutoff).limit(250).get();
-  if (stale.empty) return;
-  const batch = db.batch();
-  stale.docs.forEach(doc => batch.delete(doc.ref));
-  await batch.commit();
+exports.cleanupMatchQueue = onSchedule({schedule: "every 5 minutes", secrets: [sentryDsn]}, async () => {
+  try {
+    const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - QUEUE_TTL_MS);
+    const stale = await db.collection("matchRequests").where("updatedAt", "<", cutoff).limit(250).get();
+    if (stale.empty) return;
+    const batch = db.batch();
+    stale.docs.forEach(doc => batch.delete(doc.ref));
+    await batch.commit();
+  } catch (err) {
+    await reportError(err, "cleanupMatchQueue");
+    throw err;
+  }
 });
