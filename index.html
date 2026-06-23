@@ -365,7 +365,7 @@ const GRACE_PACKS=[
 const LEGAL_CONTENT={
   safety:{
     title:"Safety",
-    body:["Charisma is for adults 18+ only. Use public places for first dates, keep your exact address private until trust is established, and tell a friend where you are going.","Harassment, threats, hate, impersonation, sexual exploitation, scams, and sharing another person's private information are prohibited. End, block, and report any unsafe interaction.","Reports are stored securely for moderation review. For immediate danger or emergencies, contact local authorities."]
+    body:["Charisma is for adults 18+ only. Use public places for first dates, keep your exact address private until trust is established, and tell a friend where you are going.","Harassment, threats, hate, impersonation, sexual exploitation, scams, and sharing another person's private information are prohibited. End, block, and report any unsafe interaction.","Users can report or block another user from inside a live match. Reports are reviewed for moderation, and urgent safety reports can also be sent to charismalivesite@gmail.com. For immediate danger or emergencies, contact local authorities."]
   },
   privacy:{
     title:"Privacy",
@@ -377,7 +377,7 @@ const LEGAL_CONTENT={
   },
   acceptableUse:{
     title:"Acceptable Use",
-    body:["Charisma may be used only by adults age 18 or older for lawful, consensual dating and social connection.","Users may not engage in human trafficking, sexual exploitation, prostitution, grooming, coercion, non-consensual sexual content, harassment, threats, hate, scams, impersonation, stalking, extortion, illegal activity, or the sale or promotion of regulated goods or services.","Users may not aid, advertise, arrange, encourage, or conceal abuse or exploitation. Reported violations may result in immediate suspension, removal, preservation of relevant records, and referral to appropriate authorities when required by law."]
+    body:["Charisma may be used only by adults age 18 or older for lawful, consensual dating and social connection. Users confirm they are 18 or older during onboarding and must verify their email before live matching.","Users may not engage in human trafficking, sex trafficking, sexual exploitation, prostitution, grooming, coercion, non-consensual sexual content, non-consensual intimate imagery, harassment, threats, hate, scams, impersonation, stalking, extortion, illegal activity, or the sale or promotion of regulated goods or services.","Child sexual abuse material (CSAM), sexual content involving minors, exploitation of minors, and attempts to contact minors for sexual purposes are strictly prohibited. Suspected CSAM or minor exploitation is treated as an urgent safety issue and may be escalated to law enforcement or the appropriate child safety reporting authority when required by law.","Users may not aid, advertise, arrange, encourage, or conceal abuse or exploitation. Reported violations may result in immediate suspension, removal, preservation of relevant records, and referral to appropriate authorities when required by law."]
   },
   pricing:{
     title:"Pricing",
@@ -389,7 +389,11 @@ const LEGAL_CONTENT={
   },
   lawEnforcement:{
     title:"Law Enforcement",
-    body:[`Law-enforcement and government agencies may send preservation requests, subpoenas, court orders, and emergency disclosure requests to ${SUPPORT_EMAIL}. Use the subject line “Law Enforcement Request” and include agency identification, contact information, legal authority, the relevant account identifier, and the records and date range requested.`,"Charisma reviews requests for legal validity and appropriate scope. We may preserve or disclose account records when required by applicable law and may notify the affected user unless prohibited by law or an emergency creates a risk of harm.","For an immediate threat to life or physical safety, contact local emergency services first and clearly identify the emergency in the request."]
+    body:[`Law-enforcement and government agencies may send preservation requests, subpoenas, court orders, and emergency disclosure requests to ${SUPPORT_EMAIL}. Use the subject line "Law Enforcement Request" and include agency identification, contact information, legal authority, the relevant account identifier, and the records and date range requested.`,"Charisma reviews requests for legal validity and appropriate scope. We may preserve or disclose account records when required by applicable law and may notify the affected user unless prohibited by law or an emergency creates a risk of harm.","For an immediate threat to life or physical safety, contact local emergency services first and clearly identify the emergency in the request."]
+  },
+  moderation:{
+    title:"Moderation and Takedowns",
+    body:["Users can report a policy-violating profile or interaction directly inside Charisma using the Report button during a match. Users can also block another user immediately. For issues outside the app or urgent safety concerns, users can contact Charisma at charismalivesite@gmail.com.","Charisma reviews reported profiles, account details, match context, user history, and the specific policy concern. High-risk reports involving exploitation, trafficking, threats, minors, or safety danger are prioritized. Accounts may be removed from matching, suspended, permanently banned, preserved for legal reasons, or escalated to law enforcement when required.","A removed or banned user may appeal by emailing charismalivesite@gmail.com with the subject line \"Account Appeal\" and the email address connected to their account. Charisma reviews the appeal, original report, account history, and any additional context. If approved, the account may be restored or restrictions reduced. Serious safety violations, exploitation, trafficking, CSAM, threats, or repeat abuse may not be eligible for reinstatement.","Charisma requires users to create an account with email and password before using live matching. Email verification is required before entering live matching. During onboarding, users provide profile information including age, location, language, gender identity, and dating preferences so matching can be limited to compatible preferences."]
   },
   support:{
     title:"Support",
@@ -683,7 +687,7 @@ const CharismaButton=({children,variant="primary",onClick,style={}})=>(
 
 const CharismaFooter=({onStart,onLegal})=>{
   const menuA=["Live Reveal","Guided Questions","Grace Gifts","Date Planning"];
-  const menuB=[["Safety","safety"],["Privacy","privacy"],["Terms","terms"],["Acceptable Use","acceptableUse"],["Pricing","pricing"],["Refunds","refunds"],["Law Enforcement","lawEnforcement"],["Contact","support"]];
+  const menuB=[["Safety","safety"],["Privacy","privacy"],["Terms","terms"],["Acceptable Use","acceptableUse"],["Moderation","moderation"],["Pricing","pricing"],["Refunds","refunds"],["Law Enforcement","lawEnforcement"],["Contact","support"]];
   return(
     <div style={{animation:"fadeUp 0.7s ease",marginTop:26,marginBottom:28,background:"rgba(255,255,240,0.94)",backdropFilter:"blur(18px)",borderRadius:28,padding:"24px 22px",boxShadow:"0 18px 60px rgba(0,0,0,0.28)",border:"1px solid rgba(255,255,255,0.28)",fontFamily:"'Geist','Jost',sans-serif",color:"#060606",textAlign:"left"}}>
       <div style={{display:"grid",gridTemplateColumns:"1fr",gap:22}}>
