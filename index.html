@@ -687,7 +687,7 @@ const CharismaButton=({children,variant="primary",onClick,style={}})=>(
 
 const CharismaFooter=({onStart,onLegal})=>{
   const menuA=["Live Reveal","Guided Questions","Grace Gifts","Date Planning"];
-  const menuB=[["Safety","safety"],["Privacy","privacy"],["Terms","terms"],["Acceptable Use","acceptableUse"],["Moderation","moderation"],["Pricing","pricing"],["Refunds","refunds"],["Law Enforcement","lawEnforcement"],["Contact","support"]];
+  const menuB=[["Safety","safety"],["Privacy","privacy"],["Terms","terms.html","page"],["Acceptable Use","acceptable-use.html","page"],["Moderation","moderation"],["Pricing","pricing"],["Refunds","refunds"],["Law Enforcement","lawEnforcement"],["Contact","support"]];
   return(
     <div style={{animation:"fadeUp 0.7s ease",marginTop:26,marginBottom:28,background:"rgba(255,255,240,0.94)",backdropFilter:"blur(18px)",borderRadius:28,padding:"24px 22px",boxShadow:"0 18px 60px rgba(0,0,0,0.28)",border:"1px solid rgba(255,255,255,0.28)",fontFamily:"'Geist','Jost',sans-serif",color:"#060606",textAlign:"left"}}>
       <div style={{display:"grid",gridTemplateColumns:"1fr",gap:22}}>
@@ -709,8 +709,8 @@ const CharismaFooter=({onStart,onLegal})=>{
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:9}}>
             <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"#060606"}}>Trust</div>
-            {menuB.map(([item,key])=>(
-              <button key={key} className="btn" onClick={()=>onLegal(key)} style={{padding:0,textAlign:"left",background:"transparent",border:"none",fontSize:13,fontWeight:600,color:"rgba(6,6,6,0.68)",whiteSpace:"nowrap",letterSpacing:0}}>
+            {menuB.map(([item,key,mode])=>(
+              <button key={key} className="btn" onClick={()=>mode==="page"?window.location.href=key:onLegal(key)} style={{padding:0,textAlign:"left",background:"transparent",border:"none",fontSize:13,fontWeight:600,color:"rgba(6,6,6,0.68)",whiteSpace:"nowrap",letterSpacing:0}}>
                 {item}
               </button>
             ))}
