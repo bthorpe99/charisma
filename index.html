@@ -328,7 +328,7 @@ const ORIENTATION_OPTIONS=[
 ];
 const TERMS_VERSION="2026-06-18";
 const DEFAULT_PROFILE={name:"",age:"",city:"",role:"",identity:"",interestedIn:[],orientation:"",intent:"Real dates",wallet:0,isMember:false,membershipStatus:"inactive",callsUsed:0,callWindowStart:null,email:"",hasAccount:false,termsAccepted:false,giftsSent:[],giftsReceived:[]};
-const DEFAULT_ACCOUNT={email:"",password:""};
+const DEFAULT_ACCOUNT={email:"",password:"",birthdate:""};
 const LIVE_SITE_URL="https://trycharisma.live/";
 const SUPPORT_EMAIL="charismalivesite@gmail.com";
 const MATCH_API_URL="https://us-central1-charisma-c88cf.cloudfunctions.net/matchApi";
@@ -377,7 +377,7 @@ const LEGAL_CONTENT={
   },
   acceptableUse:{
     title:"Acceptable Use",
-    body:["Charisma may be used only by adults age 18 or older for lawful, consensual dating and social connection. Users confirm they are 18 or older during onboarding and must verify their email before live matching.","Users may not engage in human trafficking, sex trafficking, sexual exploitation, prostitution, grooming, coercion, non-consensual sexual content, non-consensual intimate imagery, harassment, threats, hate, scams, impersonation, stalking, extortion, illegal activity, or the sale or promotion of regulated goods or services.","Child sexual abuse material (CSAM), sexual content involving minors, exploitation of minors, and attempts to contact minors for sexual purposes are strictly prohibited. Suspected CSAM or minor exploitation is treated as an urgent safety issue and may be escalated to law enforcement or the appropriate child safety reporting authority when required by law.","Users may not aid, advertise, arrange, encourage, or conceal abuse or exploitation. Reported violations may result in immediate suspension, removal, preservation of relevant records, and referral to appropriate authorities when required by law."]
+    body:["Charisma may be used only by adults age 18 or older for lawful, consensual dating and social connection. Users must enter a date of birth during account creation, and users under 18 are blocked from creating an account. Users must also verify their email before live matching.","Users may not engage in human trafficking, sex trafficking, sexual exploitation, prostitution, grooming, coercion, non-consensual sexual content, non-consensual intimate imagery, harassment, threats, hate, scams, impersonation, stalking, extortion, illegal activity, or the sale or promotion of regulated goods or services.","Child sexual abuse material (CSAM), sexual content involving minors, exploitation of minors, and attempts to contact minors for sexual purposes are strictly prohibited. Suspected CSAM or minor exploitation is treated as an urgent safety issue and may be escalated to law enforcement or the appropriate child safety reporting authority when required by law.","Users may not aid, advertise, arrange, encourage, or conceal abuse or exploitation. Reported violations may result in immediate suspension, removal, preservation of relevant records, and referral to appropriate authorities when required by law."]
   },
   pricing:{
     title:"Pricing",
@@ -496,6 +496,16 @@ const TimeSlots=({times,selected,onSelect})=>(
 const trackFromParticipant=(participant,kind)=>{
   if(!participant)return null;
   return participant.tracks?.[kind]?.persistentTrack||participant.tracks?.[kind]?.track||participant[`${kind}Track`]||null;
+};
+const getAgeFromBirthdate=(birthdate)=>{
+  if(!birthdate)return null;
+  const born=new Date(`${birthdate}T00:00:00`);
+  if(Number.isNaN(born.getTime())||born>new Date())return null;
+  const today=new Date();
+  let age=today.getFullYear()-born.getFullYear();
+  const monthDelta=today.getMonth()-born.getMonth();
+  if(monthDelta<0||(monthDelta===0&&today.getDate()<born.getDate()))age-=1;
+  return age;
 };
 
 const DailyLiveRoom=({url,name,matchedName,blurAmount,activeQuestion,activeQuestionIndex})=>{
@@ -1020,8 +1030,17 @@ function App(){
   const saveMemberAccount=async()=>{
     const email=String(accountDraft.email||"").trim().toLowerCase();
     const password=String(accountDraft.password||"");
+    const verifiedAge=getAgeFromBirthdate(accountDraft.birthdate);
     if(!email.includes("@")||password.length<6){
       setAccountNotice("Use a real email and a password with at least 6 characters.");
+      return;
+    }
+    if(authMode==="signup"&&verifiedAge===null){
+      setAccountNotice("Enter your date of birth to complete the required 18+ age check.");
+      return;
+    }
+    if(authMode==="signup"&&verifiedAge<18){
+      setAccountNotice("Charisma is only available to adults age 18 and older. Account creation is blocked.");
       return;
     }
     setAccountNotice(authMode==="login"?"Signing in...":"Creating your account...");
@@ -1035,10 +1054,14 @@ function App(){
         const credential=await services.auth.createUserWithEmailAndPassword(email,password);
         const createdUser=credential.user;
         await createdUser.updateProfile({displayName:profileDraft.name||"Charisma member"});
+        const nextProfileDraft={...profileDraft,age:String(verifiedAge)};
+        setProfileDraft(nextProfileDraft);
+        setUserProfile(p=>({...p,age:String(verifiedAge)}));
         await services.db.collection("members").doc(createdUser.uid).set({
-          email,displayName:String(profileDraft.name||"").trim(),age:Number(profileDraft.age||0),city:String(profileDraft.city||"").trim(),
+          email,displayName:String(profileDraft.name||"").trim(),age:verifiedAge,city:String(profileDraft.city||"").trim(),
           role:profileDraft.role||"",identity:profileDraft.identity||"",interestedIn:profileDraft.interestedIn||[],
           orientation:profileDraft.orientation||"",intent:profileDraft.intent||"Real dates",
+          ageGateMethod:"date_of_birth",ageVerifiedAt:window.firebase.firestore.FieldValue.serverTimestamp(),
           termsAcceptedAt:profileDraft.termsAccepted?window.firebase.firestore.FieldValue.serverTimestamp():null,
           termsVersion:profileDraft.termsAccepted?TERMS_VERSION:"",wallet:1200,isMember:false,membershipStatus:"inactive",
           callsUsed:0,callWindowStart:null,blockedUids:[],createdAt:window.firebase.firestore.FieldValue.serverTimestamp(),
@@ -1611,6 +1634,13 @@ function App(){
                     <div style={{display:"grid",gridTemplateColumns:"1fr",gap:8,marginBottom:10}}>
                       <input value={accountDraft.email} onChange={e=>setAccountDraft(p=>({...p,email:e.target.value}))} placeholder="Email" inputMode="email" autoComplete="email" style={{padding:"12px 12px",borderRadius:11,border:"1px solid rgba(196,146,138,0.14)",background:"rgba(18,13,16,0.42)",color:T.cream,fontFamily:sans,fontSize:13,outline:"none"}}/>
                       <input value={accountDraft.password} onChange={e=>setAccountDraft(p=>({...p,password:e.target.value}))} placeholder="Password" type="password" autoComplete={authMode==="signup"?"new-password":"current-password"} style={{padding:"12px 12px",borderRadius:11,border:"1px solid rgba(196,146,138,0.14)",background:"rgba(18,13,16,0.42)",color:T.cream,fontFamily:sans,fontSize:13,outline:"none"}}/>
+                      {authMode==="signup"&&(
+                        <div>
+                          <label style={{display:"block",fontFamily:sans,fontSize:10,fontWeight:600,letterSpacing:"0.16em",textTransform:"uppercase",color:"rgba(196,146,138,0.58)",margin:"2px 0 6px"}}>Date of birth - required 18+ age check</label>
+                          <input value={accountDraft.birthdate||""} onChange={e=>setAccountDraft(p=>({...p,birthdate:e.target.value}))} type="date" max={new Date().toISOString().slice(0,10)} autoComplete="bday" style={{width:"100%",padding:"12px 12px",borderRadius:11,border:"1px solid rgba(196,146,138,0.14)",background:"rgba(18,13,16,0.42)",color:T.cream,fontFamily:sans,fontSize:13,outline:"none",colorScheme:"dark"}}/>
+                          <p style={{fontFamily:body,fontStyle:"italic",fontSize:11,color:T.muted,lineHeight:1.45,margin:"7px 0 0"}}>Users under 18 are blocked from creating a Charisma account.</p>
+                        </div>
+                      )}
                     </div>
                     <button className="btn" onClick={saveMemberAccount} style={{width:"100%",padding:"12px 10px",borderRadius:12,fontSize:12,color:T.cream,background:"rgba(201,168,122,0.12)",border:"1px solid rgba(201,168,122,0.28)",letterSpacing:"0.08em"}}>{authMode==="signup"?"Create secure account":"Sign in"}</button>
                     {authMode==="login"&&<button className="btn" onClick={resetPassword} style={{width:"100%",padding:"9px 4px",marginTop:7,borderRadius:10,fontSize:10,color:T.muted,background:"transparent",border:"none"}}>Forgot password?</button>}
